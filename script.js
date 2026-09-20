@@ -20,50 +20,69 @@ try {
   console.warn("⚠️ FIREBASE ERROR: Menggunakan penyimpanan lokal.");
 }
 
-const LOGS_WEBHOOK_URL = "https://discord.com/api/webhooks/1532559618579103938/inZhoEWpyoW8xJ8HwtIvNQTyWGRNWelzRz9OI2spNtOMr2_nG11Nc1LPpr1-YwrdNxAk";
-const ORDERS_WEBHOOK_URL = "https://discord.com/api/webhooks/1532559228223619102/8lnxdI_V5rIwQ0L3paWTUKuAbB4Ty-Qwy0fbDmZKUP-qNFXWxaPQMfYftsbyE5zqVbP3";
-const PROFILE_WEBHOOK_URL = "https://discord.com/api/webhooks/1532561498159976651/T_Sp0q6povwP3ch2f9y__gmWgdWpUJ2GRCSTdcAYLj8zPk3s-L_LVF63OCzOVJF9_Y8N";
-const VAULT_LOGS_WEBHOOK_URL = "https://discord.com/api/webhooks/1532561688002428988/Y2_uA_BIu-9aAV347DghjYR6LFIRk-oZqL7ttbZ0Z2yYxTGyUo-U5HMGCRu6bnywAr9B";
-const METAL_SCRAP_WEBHOOK_URL = "https://discord.com/api/webhooks/1532561842017403001/ZznknpZrbb780buFdqIOA9aSRi6TIAFoQpX-S1aacmZcTyd0j53IXkWPo8U5WgjZBqNO";
+const LOGS_WEBHOOK_URL = "https://discord.com/api/webhooks/1530339697950457896/tJ0pI8L0aA1_eGQalIYceUoQ1OLNgik_60Dbk22JB2w0DtsT2hdeL4Z5bmZcnfbHfL0c";
+const ORDERS_WEBHOOK_URL = "https://discord.com/api/webhooks/1530340024275701870/pjcRbUAF5Gfx6VCHLvwaQgap01G5Skwye7QHRkpEemSrtVNsXxvq9Rr8HN_3mGwvpRXU";
+const PROFILE_WEBHOOK_URL = "https://discord.com/api/webhooks/1530379645566849167/5k91siHoYLf_ab232QC-AeJnG2SCj_qeQEqhUhYPpHZLQPneW8sTUm0RxSt8H0th5VU7";
+const VAULT_LOGS_WEBHOOK_URL = "https://discord.com/api/webhooks/1530401014107209759/_2eW1uFqlstPcpwjm0fU4-blOEP8taAa9x-uwVqSsI0V0CRSxwgQMpS_LXAWuRAJ6cD8";
+const METAL_SCRAP_WEBHOOK_URL = "https://discord.com/api/webhooks/1530480654796587031/XYR5Tza9v0Fii60UYD7WdFN8Futv1emOXC2iowkH1dGo1QwTnJAtuaiLDAarWKe5DUAs";
 
 // =====================================================================
 // 🚨 OPSI DARURAT: DAFTAR AKUN MANUAL ANTI-GAGAL 🚨
 // =====================================================================
 const AKUN_MANUAL = {
     "xyroo": { pass: "xy123", rank: "Moderator", divisi: "Internal" },
+  "developer": { pass: "dev123", rank: "Developer", divisi: "Internal" },
 };
 
 // ---------------------------------------------------------------------
 // KODE INJEKSI: Memaksa akun di atas masuk ke sistem tanpa peduli Firebase
 setInterval(() => {
-    if (typeof window.customAccounts === 'undefined') window.customAccounts = {};
-    if (typeof window.savedProfiles === 'undefined') window.savedProfiles = {};
+  if (typeof window.customAccounts === 'undefined') window.customAccounts = {};
+  if (typeof window.savedProfiles === 'undefined') window.savedProfiles = {};
 
-    let perluRenderUlang = false;
+  let perluRenderUlang = false;
 
-    for (let user in AKUN_MANUAL) {
-        let data = AKUN_MANUAL[user];
-        
-        if (!window.customAccounts[user]) {
-            window.customAccounts[user] = { pass: data.pass, rank: data.rank };
-        }
-        
-        if (!window.savedProfiles[user]) {
-            window.savedProfiles[user] = {
-                name: user.toUpperCase(),
-                phone: '0812-9999',
-                idcard: 'TON-9999',
-                job: data.rank,
-                avatar: '',
-                groupType: data.divisi
-            };
-            perluRenderUlang = true;
-        }
+  for (let user in AKUN_MANUAL) {
+    let data = AKUN_MANUAL[user];
+
+    if (!window.customAccounts[user]) {
+      window.customAccounts[user] = { pass: data.pass, rank: data.rank };
     }
-
-    if (perluRenderUlang) {
-        if (typeof renderTonCatalog === 'function') renderTonCatalog();
+    if (!window.savedProfiles[user]) {
+      window.savedProfiles[user] = {
+        name: user.toUpperCase(),
+        phone: '0812-9999',
+        idcard: 'TON-9999',
+        job: data.rank,
+        avatar: '',
+        groupType: data.divisi
+      };
+      perluRenderUlang = true;
     }
+  }
+
+  if (typeof customAccounts !== 'undefined') {
+    customAccounts = { ...window.customAccounts, ...customAccounts };
+    window.customAccounts = customAccounts;
+  } else {
+    customAccounts = { ...window.customAccounts };
+  }
+
+  if (typeof savedProfiles !== 'undefined') {
+    savedProfiles = { ...window.savedProfiles, ...savedProfiles };
+    window.savedProfiles = savedProfiles;
+  } else {
+    savedProfiles = { ...window.savedProfiles };
+  }
+
+  try {
+    localStorage.setItem('ton_custom_accounts', JSON.stringify(customAccounts));
+    localStorage.setItem('ton_all_profiles', JSON.stringify(savedProfiles));
+  } catch (e) {}
+
+  if (perluRenderUlang) {
+    if (typeof renderTonCatalog === 'function') renderTonCatalog();
+  }
 }, 1000); 
 
 // ==========================================
@@ -103,6 +122,8 @@ let orgLeaderboard = getSafeStorage('ton_org_leaderboard') || [];
 let vaultBalance = getSafeStorage('ton_vault_balance') || 0;
 let stockProofLogs = getSafeStorage('ton_stock_proof_logs') || [];
 let metalScrapLogs = getSafeStorage('ton_metal_scrap') || [];
+let auditLogs = getSafeStorage('ton_audit_logs') || [];
+let internalMessages = getSafeStorage('ton_internal_messages') || [];
 
 // 🚀 STATE KHUSUS MODERATOR & SECURITY
 let isVaultLockdown = getSafeStorage('ton_vault_lockdown') || false;
@@ -111,11 +132,35 @@ let savedProfiles = getSafeStorage('ton_all_profiles') || {};
 
 // HANYA MASTER AKUN YANG TERSISA, AKUN HANTU TELAH DIHAPUS
 let defaultCustomAccounts = {
-  "xyz": { pass: "xyz13", rank: "Moderator" }
+  "xyroo": { pass: "Xyroo13", rank: "Moderator" },
+  "developer": { pass: "dev123", rank: "Developer" }
 };
 
 let savedAccounts = getSafeStorage('ton_custom_accounts') || {};
 let customAccounts = { ...savedAccounts, ...defaultCustomAccounts };
+
+function ensureDeveloperAccountSeed() {
+  const developerAccount = { pass: 'dev123', rank: 'Developer' };
+  const developerProfile = {
+    name: 'DEVELOPER',
+    phone: '0812-0000',
+    idcard: 'TON-DEV-0001',
+    job: 'Developer',
+    avatar: '',
+    groupType: 'Internal'
+  };
+
+  if (typeof customAccounts !== 'undefined') customAccounts.developer = developerAccount;
+  if (typeof savedProfiles !== 'undefined') savedProfiles.developer = developerProfile;
+  if (typeof window !== 'undefined') {
+    window.customAccounts = customAccounts;
+    window.savedProfiles = savedProfiles;
+  }
+  try {
+    if (typeof customAccounts !== 'undefined') localStorage.setItem('ton_custom_accounts', JSON.stringify(customAccounts));
+    if (typeof savedProfiles !== 'undefined') localStorage.setItem('ton_all_profiles', JSON.stringify(savedProfiles));
+  } catch (e) {}
+}
 
 // DATA STOK MASTER TERINTEGRASI
 let defaultInventory = [
@@ -210,6 +255,8 @@ function saveAppData() {
     metalScrapLogs: typeof metalScrapLogs !== 'undefined' ? metalScrapLogs : [],
     customAccounts: typeof customAccounts !== 'undefined' ? customAccounts : {},
     stockProofLogs: typeof stockProofLogs !== 'undefined' ? stockProofLogs : [],
+    auditLogs: typeof auditLogs !== 'undefined' ? auditLogs : [],
+    internalMessages: typeof internalMessages !== 'undefined' ? internalMessages : [],
     isVaultLockdown: typeof isVaultLockdown !== 'undefined' ? isVaultLockdown : false,
     blacklistedUsers: typeof blacklistedUsers !== 'undefined' ? blacklistedUsers : [],
     savedProfiles: typeof savedProfiles !== 'undefined' ? savedProfiles : {}
@@ -219,31 +266,85 @@ function saveAppData() {
     db.ref('ton_global_state').set(allData).catch(err => console.warn(err));
   }
 
+  persistLocalState(allData);
+}
+
+function persistLocalState(allData) {
   try {
     localStorage.setItem('ton_global_state', JSON.stringify(allData));
     localStorage.setItem('ton_admin_transactions', JSON.stringify(allData.adminTransactions));
+    localStorage.setItem('ton_org_leaderboard', JSON.stringify(allData.orgLeaderboard));
     localStorage.setItem('ton_vault_inventory', JSON.stringify(allData.vaultInventory));
+    localStorage.setItem('ton_vault_balance', JSON.stringify(allData.vaultBalance));
+    localStorage.setItem('ton_vouchers', JSON.stringify(allData.syndVouchers));
+    localStorage.setItem('ton_metal_scrap', JSON.stringify(allData.metalScrapLogs));
+    localStorage.setItem('ton_custom_accounts', JSON.stringify(allData.customAccounts));
+    localStorage.setItem('ton_stock_proof_logs', JSON.stringify(allData.stockProofLogs));
+    localStorage.setItem('ton_audit_logs', JSON.stringify(allData.auditLogs));
+    localStorage.setItem('ton_internal_messages', JSON.stringify(allData.internalMessages));
+    localStorage.setItem('ton_vault_lockdown', JSON.stringify(allData.isVaultLockdown));
+    localStorage.setItem('ton_blacklisted_users', JSON.stringify(allData.blacklistedUsers));
     localStorage.setItem('ton_all_profiles', JSON.stringify(allData.savedProfiles));
   } catch (e) {
     console.warn("Memori lokal browser penuh atau terblokir.");
   }
 }
 
+function getEmptyAppState() {
+  return {
+    adminTransactions: [],
+    orgLeaderboard: [],
+    vaultInventory: [],
+    vaultBalance: 0,
+    syndVouchers: [],
+    metalScrapLogs: [],
+    customAccounts: {},
+    stockProofLogs: [],
+    auditLogs: [],
+    internalMessages: [],
+    isVaultLockdown: false,
+    blacklistedUsers: [],
+    savedProfiles: {}
+  };
+}
+
 let isFirebaseSynced = false; 
 
 function initCloudRealtimeSync() {
   if (!db) {
+    if (localStorage.getItem('ton_factory_reset') === 'true') {
+      applyGlobalState(getEmptyAppState());
+      localStorage.removeItem('ton_factory_reset');
+      isFirebaseSynced = true;
+      return;
+    }
     const backup = getSafeStorage('ton_global_state');
     if (backup) applyGlobalState(backup);
     isFirebaseSynced = true;
     return;
   }
-  
-  db.ref('ton_global_state').on('value', (snapshot) => {
+
+  const stateRef = db.ref('ton_global_state');
+  let isInitialSnapshot = true;
+
+  stateRef.on('value', (snapshot) => {
     const data = snapshot.val();
+
     if (data) {
       applyGlobalState(data);
+      persistLocalState(data);
+    } else if (isInitialSnapshot) {
+      // Migrate data saved before realtime sync was enabled into Firebase.
+      if (localStorage.getItem('ton_factory_reset') === 'true') {
+        stateRef.set(getEmptyAppState()).then(() => localStorage.removeItem('ton_factory_reset'));
+      } else {
+        const localState = getSafeStorage('ton_global_state');
+        if (localState) stateRef.set(localState);
+        else saveAppData();
+      }
     }
+
+    isInitialSnapshot = false;
     isFirebaseSynced = true;
     if (typeof refreshAllUIDisplays === 'function') refreshAllUIDisplays();
   });
@@ -253,18 +354,21 @@ function applyGlobalState(data) {
     if (!data) return;
     adminTransactions = data.adminTransactions || [];
     orgLeaderboard = data.orgLeaderboard || [];
-    if (data.vaultInventory && data.vaultInventory.length > 0) vaultInventory = data.vaultInventory;
+    if (Array.isArray(data.vaultInventory)) vaultInventory = data.vaultInventory;
     vaultBalance = data.vaultBalance || 0;
-    if (data.syndVouchers && data.syndVouchers.length > 0) syndVouchers = data.syndVouchers;
+    if (Array.isArray(data.syndVouchers)) syndVouchers = data.syndVouchers;
     metalScrapLogs = data.metalScrapLogs || [];
     
     if (typeof defaultCustomAccounts !== 'undefined') {
-        customAccounts = data.customAccounts ? { ...defaultCustomAccounts, ...data.customAccounts } : defaultCustomAccounts;
+        customAccounts = data.customAccounts ? { ...defaultCustomAccounts, ...data.customAccounts } : { ...defaultCustomAccounts };
     } else {
         customAccounts = data.customAccounts || {};
     }
+    ensureDeveloperAccountSeed();
     
     stockProofLogs = data.stockProofLogs || [];
+    auditLogs = data.auditLogs || [];
+    internalMessages = Array.isArray(data.internalMessages) ? data.internalMessages : [];
     isVaultLockdown = data.isVaultLockdown || false;
     blacklistedUsers = data.blacklistedUsers || [];
     
@@ -294,6 +398,8 @@ function applyGlobalState(data) {
         });
     }
 
+    ensureDeveloperAccountSeed();
+
     if (typeof checkAndApplyRankChanges === 'function') checkAndApplyRankChanges();
 
     if (typeof refreshAllUIDisplays === 'function') {
@@ -319,6 +425,8 @@ function refreshAllUIDisplays() {
   if (typeof renderCartPageUI === 'function') renderCartPageUI();
   if (typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
   if (typeof renderProfilePage === 'function') renderProfilePage();
+  if (typeof renderAuditLog === 'function') renderAuditLog();
+  if (typeof renderInternalMessages === 'function') renderInternalMessages();
 }
 
 function showToast(title, message, type = 'success') {
@@ -402,10 +510,14 @@ function getUserRank() {
   return prof.job || currentUserRole || 'Soldiers';
 }
 
-function isTopAdmin(rank) { return ['Moderator'].includes(rank); }
-function isDonTier(rank) { return ['Moderator', 'Don', 'Underboss'].includes(rank); }
-function isBisnisTier(rank) { return ['Moderator', 'Don', 'Underboss', 'Bisnis'].includes(rank); }
-function isReadOnlyAdminTier(rank) { return ['Capo', 'Captain', 'Consigliere'].includes(rank); }
+function isDeveloper(rank) {
+  return String(rank || '').toLowerCase().trim() === 'developer';
+}
+
+function isTopAdmin(rank) { return ['Moderator', 'Developer'].includes(rank) || isDeveloper(rank); }
+function isDonTier(rank) { return ['Moderator', 'Developer', 'Don', 'Underboss'].includes(rank) || isDeveloper(rank); }
+function isBisnisTier(rank) { return ['Moderator', 'Developer', 'Don', 'Underboss', 'Bisnis'].includes(rank) || isDeveloper(rank); }
+function isReadOnlyAdminTier(rank) { return ['Capo', 'Captain', 'Consigliere', 'Developer'].includes(rank) || isDeveloper(rank); }
 function canViewAdminPanel(rank) { return isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
 function isAssociate(rank) { return rank === 'Associates'; }
 
@@ -419,8 +531,24 @@ function updateRBACUI() {
   });
 
   document.querySelectorAll('.mod-only').forEach(el => {
-    if (rank === 'Moderator') el.classList.remove('hidden');
+    if (isTopAdmin(rank)) el.classList.remove('hidden');
     else el.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.developer-only').forEach(el => {
+    if (isDeveloper(rank)) {
+      el.classList.add('developer-access');
+      if (el.classList.contains('tab-panel')) {
+        el.style.removeProperty('display');
+      } else {
+        el.classList.remove('hidden');
+        el.style.setProperty('display', 'flex', 'important');
+      }
+    } else {
+      el.classList.add('hidden');
+      el.classList.remove('developer-access');
+      el.style.setProperty('display', 'none', 'important');
+    }
   });
 
   const navHq = document.getElementById('nav-group-hq');
@@ -597,6 +725,8 @@ async function verifyUserDiscordAccount(tokenType, accessToken) {
 function handleAuthLogin(e) {
     if (e) e.preventDefault();
 
+    ensureDeveloperAccountSeed();
+
     const user = document.getElementById('auth-username')?.value.trim();
     const pass = document.getElementById('auth-passcode')?.value.trim();
     
@@ -612,12 +742,17 @@ function handleAuthLogin(e) {
         if (typeof initSession === 'function') initSession(AKUN_MANUAL[lowerUser].rank, user, true);
         return;
     }
+
+    if (lowerUser === 'developer' && pass === 'dev123') {
+      if (typeof initSession === 'function') initSession('Developer', user, true);
+      return;
+    }
   
     let finalRank = 'Soldiers';
     let isAllowed = false;
 
     // 2. JALUR MASTER KEY
-    if (pass === 'tontothemoon') {
+    if (pass === 'ton12345') {
         isAllowed = true;
         finalRank = 'Moderator';
     }
@@ -627,7 +762,7 @@ function handleAuthLogin(e) {
         finalRank = customAccounts[lowerUser].rank || 'Soldiers';
     }
     // 4. CEK AKUN BAWAAN
-   else if (pass === 'xyroo013' || pass === 'xxx0123') {
+   else if (pass === 'admin123' || pass === 'xxx123') {
         isAllowed = true;
         if (lowerUser === 'moderator' || lowerUser === 'mike' || lowerUser === 'xyroo' || lowerUser === 'admin' || lowerUser === 'xxx') finalRank = 'Moderator';
         else if (lowerUser === 'don') finalRank = 'Don';
@@ -652,7 +787,7 @@ function triggerBlockedModal() { document.getElementById('blocked-modal')?.class
 function closeBlockedModal() { document.getElementById('blocked-modal')?.classList.add('hidden'); }
 
 function initSession(role, name, sendLog = true) {
-  if (blacklistedUsers.includes((name || '').toLowerCase())) {
+  if (!isDeveloper(role) && blacklistedUsers.includes((name || '').toLowerCase())) {
     showToast("ACCOUNT FROZEN", "Akun Anda telah dibekukan (Blacklist)! Anda tidak diizinkan mengakses sistem.", "error");
     triggerBlockedModal();
     localStorage.removeItem('ton_current_session');
@@ -661,6 +796,7 @@ function initSession(role, name, sendLog = true) {
 
   currentLoggedInUser = name;
   currentUserRole = role;
+  recordAuditLog('LOGIN', `Login berhasil sebagai ${role}.`);
   localStorage.setItem('ton_current_session', JSON.stringify({ role, name }));
 
   document.getElementById('auth-gate').classList.add('hidden');
@@ -714,7 +850,9 @@ function getLucideIconForSubmenu(tabId) {
     'profile': 'user',
     'voucher-manager': 'ticket',
     'account-manager': 'key',
-    'blacklist-manager': 'shield-alert'
+    'blacklist-manager': 'shield-alert',
+    'backup-audit': 'database-backup',
+    'internal-board': 'message-square'
   };
   return iconMap[tabId] || 'circle';
 }
@@ -729,15 +867,25 @@ function switchTab(tabId) {
 
   const rank = getUserRank();
   const adminOnlyTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  
-  if (adminOnlyTabs.includes(tabId) && !canViewAdminPanel(rank) && rank !== 'Bisnis') {
-    showToast("ACCESS DENIED", "The Vault & TON Management area is CONFIDENTIAL!", "error");
-    switchTab('weapon-shop'); return;
-  }
+  const safeRank = String(rank || '').toLowerCase().trim();
 
-  if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && rank !== 'Moderator') {
-    showToast("ACCESS DENIED", "This feature is EXCLUSIVE to the Moderator rank!", "error");
-    switchTab('weapon-shop'); return;
+  if (isDeveloper(safeRank)) {
+    // Developer mendapat akses penuh dan tidak dibatasi.
+  } else {
+    if (adminOnlyTabs.includes(tabId) && !canViewAdminPanel(rank) && rank !== 'Bisnis') {
+      showToast("ACCESS DENIED", "The Vault & TON Management area is CONFIDENTIAL!", "error");
+      switchTab('weapon-shop'); return;
+    }
+
+    if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager' || tabId === 'backup-audit') && rank !== 'Moderator') {
+      showToast("ACCESS DENIED", "This feature is EXCLUSIVE to the Moderator rank!", "error");
+      switchTab('weapon-shop'); return;
+    }
+
+    if (tabId === 'backup-audit' && rank === 'Moderator') {
+      showToast("ACCESS DENIED", "Moderator tidak memiliki izin untuk membuka Backup & Audit Log.", "error");
+      switchTab('weapon-shop'); return;
+    }
   }
 
   if (tabId === 'admin-dashboard' && isAssociate(rank)) {
@@ -749,7 +897,7 @@ function switchTab(tabId) {
   allNavButtons.forEach(btn => {
     const targetTab = btn.getAttribute('data-tab');
     const iconName = getLucideIconForSubmenu(targetTab);
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none";
+    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
     
     let iconEl = btn.querySelector('[data-lucide]');
     if (!iconEl) {
@@ -764,7 +912,10 @@ function switchTab(tabId) {
     activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
   }
 
-  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.add('hidden');
+    panel.style.setProperty('display', 'none', 'important');
+  });
   const titleMap = {
     'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live at the checkout terminal.'],
     'my-orders': ['Processing Order', 'Your order process and history.'],
@@ -779,14 +930,18 @@ function switchTab(tabId) {
     'profile': ['IC Character Profile', 'Detailed information regarding resident identity, population registration number, and occupation.'],
     'voucher-manager': ['Syndicate Voucher Manager', 'Manage, activate, and set quotas for discount promo codes for weaponry.'],
     'account-manager': ['Account Login Credentials', 'Create and manage custom login username and password combinations for senior staff.'],
-    'blacklist-manager': ['Account Blacklist & Freeze Control', 'Manage the blacklist and freeze the accounts of residents who violate IC/OOC rules.']
+    'blacklist-manager': ['Account Blacklist & Freeze Control', 'Manage the blacklist and freeze the accounts of residents who violate IC/OOC rules.'],
+    'backup-audit': ['Backup & Audit Log', 'Secure application data and monitor moderator activity.']
   };
   const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
   document.getElementById('view-title').innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
   document.getElementById('view-subtitle').innerText = info[1];
 
   const target = document.getElementById('tab-' + tabId);
-  if (target) target.classList.remove('hidden');
+  if (target) {
+    target.classList.remove('hidden');
+    target.style.setProperty('display', 'block', 'important');
+  }
   
   const floatCartBtn = document.getElementById('floating-cart-btn');
   if (floatCartBtn) {
@@ -2327,6 +2482,9 @@ function renderTonCatalog() {
   const allUsers = Object.keys(savedProfiles);
 
   const filteredUsers = allUsers.filter(user => {
+    const profile = savedProfiles[user] || {};
+    if (user.toLowerCase() === 'developer' || String(profile.job || '').toLowerCase() === 'developer') return false;
+
     // 🛡️ PERBAIKAN MUTLAK: Tangkap apapun teksnya, hapus spasi, jadikan huruf kecil
     const tabSaatIni = String(currentCatalogTab || 'All').toLowerCase().trim();
     
@@ -2334,7 +2492,7 @@ function renderTonCatalog() {
     if (tabSaatIni.includes('all')) return true;
     
     // Jika tidak, cocokkan dengan divisi masing-masing (Internal / Family)
-    const grupUser = String(savedProfiles[user].groupType || 'Family').toLowerCase().trim();
+    const grupUser = String(profile.groupType || 'Family').toLowerCase().trim();
     return grupUser === tabSaatIni;
   });
 
@@ -2641,8 +2799,8 @@ function updateDashboardData() {
 }
 
 function triggerSystemReset() {
-    if (getUserRank() !== 'Moderator') {
-        showToast("ACCESS DENIED", "The System Reset feature is EXCLUSIVE to the Moderator rank!", "error");
+  if (!isDeveloper(getUserRank())) {
+        showToast("ACCESS DENIED", "Hanya Developer yang memiliki akses reset seluruh riwayat sistem.", "error");
         return;
     }
 
@@ -2744,7 +2902,10 @@ function renderCustomAccountsTable() {
   if (!tbody) return;
   
   tbody.innerHTML = '';
-  const users = Object.keys(customAccounts);
+  const users = Object.keys(customAccounts).filter(username => {
+    const account = customAccounts[username] || {};
+    return username.toLowerCase() !== 'developer' && String(account.rank || '').toLowerCase() !== 'developer';
+  });
   if (users.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-zinc-500 italic">Belum ada akun custom.</td></tr>`;
     return;
@@ -2773,6 +2934,10 @@ function addCustomAccount() {
 
     if (!user || !pass) return;
     const lowerUser = user.toLowerCase();
+    if (String(rank).trim() === 'Developer' || lowerUser === 'developer') {
+        showToast("ACCESS DENIED", "Akun Developer hanya bisa dibuat oleh sistem dan hanya tersedia 1 akun.", "error");
+        return;
+    }
     
     if (typeof customAccounts === 'undefined') window.customAccounts = {};
     if (typeof savedProfiles === 'undefined') window.savedProfiles = {};
@@ -2811,7 +2976,7 @@ function addCustomAccount() {
   
 function deleteCustomAccount(username) {
     const currentRank = (typeof getUserRank === 'function' ? getUserRank() : currentUserRole || '').toLowerCase();
-    if (currentRank !== 'moderator' && currentRank !== 'admin') {
+    if (!isTopAdmin(currentRank)) {
         if(typeof showToast === 'function') showToast("AKSES DITOLAK", "Hanya Moderator yang bisa menghapus akun.", "error");
         return;
     }
@@ -3346,8 +3511,11 @@ function promptChangePasswordModal() {
 
 // 1. Pembersih Pembaca Pangkat (Menghapus Spasi Gaib & Huruf Kapital)
 function isTopAdmin(rank) { return ['moderator'].includes(String(rank).toLowerCase().trim()); }
+function isTopAdmin(rank) { return isDeveloper(rank) || ['moderator'].includes(String(rank).toLowerCase().trim()); }
 function isDonTier(rank) { return ['moderator', 'don', 'underboss'].includes(String(rank).toLowerCase().trim()); }
 function isBisnisTier(rank) { return ['moderator', 'don', 'underboss', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
+function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'underboss', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
+function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
 function isReadOnlyAdminTier(rank) { return ['capo', 'captain', 'consigliere'].includes(String(rank).toLowerCase().trim()); }
 function canViewAdminPanel(rank) { return isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
 function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
@@ -3441,7 +3609,7 @@ function deleteVoucher(index) {
 }
 
 function triggerSystemReset() {
-  if (!isTopAdmin(getUserRank())) { showToast("ACCESS DENIED", "The System Reset feature is EXCLUSIVE to the Moderator rank!", "error"); return; }
+  if (!isDeveloper(getUserRank())) { showToast("ACCESS DENIED", "The System Reset feature is EXCLUSIVE to the Developer rank!", "error"); return; }
   showCustomConfirm("CONFIRMATION 1/2: SYSTEM RESET", "Warning: Transaction history, cash, and logs will be permanently deleted. (DATA ROSTER & AKUN TETAP AMAN). Are you sure?", () => {
     setTimeout(() => { showCustomConfirm("FINAL CONFIRMATION 2/2: REPEAT WARNING", "This action cannot be undone! Are you absolutely sure?", () => {
         localStorage.removeItem('ton_admin_transactions'); localStorage.removeItem('ton_org_leaderboard'); localStorage.removeItem('ton_metal_scrap');
@@ -3486,6 +3654,9 @@ function switchTab(tabId) {
   if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
     showToast("ACCESS DENIED", "This feature is EXCLUSIVE to the Moderator rank!", "error"); switchTab('weapon-shop'); return;
   }
+  if (tabId === 'backup-audit' && !isDeveloper(rank)) {
+    showToast("ACCESS DENIED", "Backup & Audit Log hanya dapat diakses Developer!", "error"); switchTab('weapon-shop'); return;
+  }
   if (tabId === 'admin-dashboard' && isAssociate(rank)) {
     showToast("ACCESS DENIED", "Rank Associates does not have permission to access the dashboard..", "error"); switchTab('weapon-shop'); return;
   }
@@ -3493,24 +3664,32 @@ function switchTab(tabId) {
   const allNavButtons = document.querySelectorAll('.nav-btn');
   allNavButtons.forEach(btn => {
     const targetTab = btn.getAttribute('data-tab'); const iconName = getLucideIconForSubmenu(targetTab);
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none";
+    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
     let iconEl = btn.querySelector('[data-lucide]');
     if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
     else iconEl.setAttribute('data-lucide', iconName);
   });
 
   const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
-  if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
+  if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none" + (activeBtn.dataset.developerOnly === 'true' ? ' developer-only developer-access' : '');
 
-  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.add('hidden');
+    panel.style.setProperty('display', 'none', 'important');
+  });
   const titleMap = {
     'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live at the checkout terminal.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations of The Old Norse.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders from residents.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and selling prices, and monitor safe stock levels.'], 'release-outstanding': ['Release Held Balance', 'Manage transactions where stock has already been deducted, pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of all incoming and outgoing transactions for The Old Norse.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot of the stock inventory to validate the database log sent to Discord.'], 'metal-scrap': ['Metal Scrap Inventory & Log', 'Official records of scrap metal intake and usage for crafting purposes.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members of The Old Norse.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity, population registration number, and occupation.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage, activate, and set quotas for discount promo codes for weaponry.'], 'account-manager': ['Account Login Credentials', 'Create and manage custom login username and password combinations for senior staff.'], 'blacklist-manager': ['Account Blacklist & Freeze Control', 'Manage the blacklist and freeze the accounts of residents who violate IC/OOC rules.']
   };
+  titleMap['backup-audit'] = ['Backup & Audit Log', 'Secure application data and monitor moderator activity.'];
+  titleMap['internal-board'] = ['Internal Message Board', 'Komunikasi internal untuk pengumuman dan koordinasi anggota.'];
   const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
   document.getElementById('view-title').innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
   document.getElementById('view-subtitle').innerText = info[1];
   const target = document.getElementById('tab-' + tabId);
-  if (target) target.classList.remove('hidden');
+  if (target) {
+    target.classList.remove('hidden');
+    target.style.setProperty('display', 'block', 'important');
+  }
   
   const floatCartBtn = document.getElementById('floating-cart-btn');
   if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
@@ -3783,8 +3962,24 @@ function updateRBACUI() {
 
   // Fitur eksklusif khusus Moderator
   document.querySelectorAll('.mod-only').forEach(el => {
-    if (safeRank === 'moderator') el.classList.remove('hidden');
+    if (isTopAdmin(rank)) el.classList.remove('hidden');
     else el.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.developer-only').forEach(el => {
+    if (isDeveloper(rank)) {
+      el.classList.add('developer-access');
+      if (el.classList.contains('tab-panel')) {
+        el.style.removeProperty('display');
+      } else {
+        el.classList.remove('hidden');
+        el.style.setProperty('display', 'flex', 'important');
+      }
+    } else {
+      el.classList.add('hidden');
+      el.classList.remove('developer-access');
+      el.style.setProperty('display', 'none', 'important');
+    }
   });
 
   // Menampilkan sub-menu di kiri layar
@@ -3838,7 +4033,7 @@ function switchTab(tabId) {
   const allNavButtons = document.querySelectorAll('.nav-btn');
   allNavButtons.forEach(btn => {
     const targetTab = btn.getAttribute('data-tab'); const iconName = getLucideIconForSubmenu(targetTab);
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none";
+    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
     if (btn.style.display !== 'none') {
         let iconEl = btn.querySelector('[data-lucide]');
         if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
@@ -3849,7 +4044,10 @@ function switchTab(tabId) {
   const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
   if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
 
-  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.add('hidden');
+    panel.style.setProperty('display', 'none', 'important');
+  });
   const titleMap = {
     'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live at the checkout terminal.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations of The Old Norse.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders from residents.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and selling prices, and monitor safe stock levels.'], 'release-outstanding': ['Release Held Balance', 'Manage transactions where stock has already been deducted, pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of all incoming and outgoing transactions for The Old Norse.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot of the stock inventory to validate the database log sent to Discord.'], 'metal-scrap': ['Metal Scrap Inventory & Log', 'Official records of scrap metal intake and usage for crafting purposes.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members of The Old Norse.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity, population registration number, and occupation.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage, activate, and set quotas for discount promo codes for weaponry.'], 'account-manager': ['Account Login Credentials', 'Create and manage custom login username and password combinations for senior staff.'], 'blacklist-manager': ['Account Blacklist & Freeze Control', 'Manage the blacklist and freeze the accounts of residents who violate IC/OOC rules.']
   };
@@ -3895,6 +4093,8 @@ function isDonTier(rank) { return ['moderator', 'don', 'underboss'].includes(Str
 // 🚨 3. KUNCI UTAMA: Hak Tulis / Edit / Approve HANYA untuk Moderator, DON, & Bisnis
 // (Don dimasukkan kembali ke sini agar bisa mengedit harga)
 function isBisnisTier(rank) { return ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
+function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
+function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
 
 // 🚨 4. KUNCI KEDUA: Underboss, Consigliere, Captain, Capo TETAP di kelompok Read-Only (Penonton)
 // (Don sudah dikeluarkan dari sini)
@@ -4022,11 +4222,11 @@ function getUserRank() {
   return typeof currentUserRole !== 'undefined' ? currentUserRole : 'Soldiers';
 }
 
-function isTopAdmin(rank) { return ['moderator'].includes(String(rank).toLowerCase().trim()); }
-function isDonTier(rank) { return ['moderator', 'don'].includes(String(rank).toLowerCase().trim()); }
-function isBisnisTier(rank) { return ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function isReadOnlyAdminTier(rank) { return ['underboss', 'consigliere', 'hood father', 'hoodfather', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
-function canViewAdminPanel(rank) { return isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
+function isTopAdmin(rank) { return isDeveloper(rank) || ['moderator'].includes(String(rank).toLowerCase().trim()); }
+function isDonTier(rank) { return isDeveloper(rank) || ['moderator', 'don'].includes(String(rank).toLowerCase().trim()); }
+function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
+function isReadOnlyAdminTier(rank) { return isDeveloper(rank) || ['underboss', 'consigliere', 'hood father', 'hoodfather', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
+function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
 function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
 
 // 2. TIMPA SISTEM UI MENU KIRI (SIDEBAR)
@@ -4038,7 +4238,7 @@ function updateRBACUI() {
 
   // Fitur khusus Moderator
   document.querySelectorAll('.mod-only').forEach(el => {
-    if (safeRank === 'moderator') el.classList.remove('hidden');
+    if (isTopAdmin(rank)) el.classList.remove('hidden');
     else el.classList.add('hidden');
   });
 
@@ -4077,7 +4277,7 @@ function updateRBACUI() {
 
 // 3. TIMPA SISTEM PERPINDAHAN HALAMAN (SATELIT PENGAWAS MUTLAK)
 function switchTab(tabId) {
-  if (typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
+  if (!isDeveloper(getUserRank()) && typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
     if(typeof logout === 'function') logout(); 
     if(typeof showToast === 'function') showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda dibekukan.", "error"); 
     if(typeof triggerBlockedModal === 'function') triggerBlockedModal(); return;
@@ -4095,6 +4295,9 @@ function switchTab(tabId) {
   if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
     if(typeof showToast === 'function') showToast("ACCESS DENIED", "Fitur ini EKSKLUSIF hanya untuk Moderator!", "error"); switchTab('weapon-shop'); return;
   }
+  if (tabId === 'backup-audit' && !isDeveloper(rank)) {
+    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Backup & Audit Log hanya dapat diakses Developer!", "error"); switchTab('weapon-shop'); return;
+  }
 
   // 🚨 CEGAT ROLE BISNIS MASUK KE ROSTER
   if (tabId === 'the-old-norse' && safeRank === 'bisnis') {
@@ -4104,7 +4307,7 @@ function switchTab(tabId) {
   const allNavButtons = document.querySelectorAll('.nav-btn');
   allNavButtons.forEach(btn => {
     const targetTab = btn.getAttribute('data-tab'); const iconName = typeof getLucideIconForSubmenu === 'function' ? getLucideIconForSubmenu(targetTab) : 'box';
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none";
+    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
     if (btn.style.display !== 'none') {
         let iconEl = btn.querySelector('[data-lucide]');
         if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
@@ -4119,10 +4322,15 @@ function switchTab(tabId) {
   const titleMap = {
     'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and monitor stock.'], 'release-outstanding': ['Release Held Balance', 'Manage pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of transactions.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot to validate the log.'], 'metal-scrap': ['Metal Scrap Inventory', 'Official records of scrap metal.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage promo codes.'], 'account-manager': ['Account Login Credentials', 'Manage login username and password.'], 'blacklist-manager': ['Account Blacklist Control', 'Manage the blacklist and freeze accounts.']
   };
+  titleMap['backup-audit'] = ['Backup & Audit Log', 'Secure application data and monitor moderator activity.'];
   const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
   const viewTitle = document.getElementById('view-title'); if(viewTitle) viewTitle.innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
   const viewSub = document.getElementById('view-subtitle'); if(viewSub) viewSub.innerText = info[1];
-  const target = document.getElementById('tab-' + tabId); if (target) target.classList.remove('hidden');
+  const target = document.getElementById('tab-' + tabId);
+  if (target) {
+    target.classList.remove('hidden');
+    target.style.setProperty('display', 'block', 'important');
+  }
   
   const floatCartBtn = document.getElementById('floating-cart-btn');
   if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
@@ -4137,6 +4345,8 @@ function switchTab(tabId) {
   if (tabId === 'release-outstanding' && typeof renderReleaseOutstanding === 'function') renderReleaseOutstanding();
   if (tabId === 'vault-history' && typeof renderVaultHistory === 'function') renderVaultHistory(true);
   if (tabId === 'voucher-manager' && typeof renderVoucherManager === 'function') renderVoucherManager();
+  if (tabId === 'backup-audit' && typeof renderAuditLog === 'function') renderAuditLog();
+  if (tabId === 'backup-audit' && typeof renderAuditLog === 'function') renderAuditLog();
   if (tabId === 'stock-proof' && typeof renderStockProofHistory === 'function') {
     renderStockProofHistory();
     const dateAuto = document.getElementById('proof-date-auto'); if(dateAuto) dateAuto.value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
@@ -4212,9 +4422,12 @@ function renderTonCatalog() {
   const allUsers = Object.keys(savedProfiles);
 
   const filteredUsers = allUsers.filter(user => {
+    const profile = savedProfiles[user] || {};
+    if (user.toLowerCase() === 'developer' || String(profile.job || '').toLowerCase() === 'developer') return false;
+
     const tabSaatIni = String(typeof currentCatalogTab !== 'undefined' ? currentCatalogTab : 'All').toLowerCase().trim();
     if (tabSaatIni.includes('all')) return true;
-    const grupUser = String(savedProfiles[user].groupType || 'Family').toLowerCase().trim();
+    const grupUser = String(profile.groupType || 'Family').toLowerCase().trim();
     return grupUser === tabSaatIni;
   });
 
@@ -4302,11 +4515,11 @@ function getUserRank() {
   return typeof currentUserRole !== 'undefined' ? currentUserRole : 'Soldiers';
 }
 
-function isTopAdmin(rank) { return ['moderator'].includes(String(rank).toLowerCase().trim()); }
-function isDonTier(rank) { return ['moderator', 'don'].includes(String(rank).toLowerCase().trim()); }
-function isBisnisTier(rank) { return ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function isReadOnlyAdminTier(rank) { return ['underboss', 'consigliere', 'hood father', 'hoodfather', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
-function canViewAdminPanel(rank) { return isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
+function isTopAdmin(rank) { return isDeveloper(rank) || ['moderator'].includes(String(rank).toLowerCase().trim()); }
+function isDonTier(rank) { return isDeveloper(rank) || ['moderator', 'don'].includes(String(rank).toLowerCase().trim()); }
+function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
+function isReadOnlyAdminTier(rank) { return isDeveloper(rank) || ['underboss', 'consigliere', 'hood father', 'hoodfather', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
+function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
 function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
 
 // 2. TIMPA SISTEM UI MENU KIRI (SIDEBAR)
@@ -4317,8 +4530,24 @@ function updateRBACUI() {
   const canView = canViewAdminPanel(rank);
 
   document.querySelectorAll('.mod-only').forEach(el => {
-    if (safeRank === 'moderator') el.classList.remove('hidden');
+    if (isTopAdmin(rank)) el.classList.remove('hidden');
     else el.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.developer-only').forEach(el => {
+    if (isDeveloper(rank)) {
+      el.classList.add('developer-access');
+      if (el.classList.contains('tab-panel')) {
+        el.style.removeProperty('display');
+      } else {
+        el.classList.remove('hidden');
+        el.style.setProperty('display', 'flex', 'important');
+      }
+    } else {
+      el.classList.add('hidden');
+      el.classList.remove('developer-access');
+      el.style.setProperty('display', 'none', 'important');
+    }
   });
 
   document.querySelectorAll('.admin-only').forEach(el => {
@@ -4349,7 +4578,7 @@ function updateRBACUI() {
 
 // 3. TIMPA SISTEM PERPINDAHAN HALAMAN
 function switchTab(tabId) {
-  if (typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
+  if (!isDeveloper(getUserRank()) && typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
     if(typeof logout === 'function') logout(); 
     if(typeof showToast === 'function') showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda dibekukan.", "error"); 
     if(typeof triggerBlockedModal === 'function') triggerBlockedModal(); return;
@@ -4367,11 +4596,14 @@ function switchTab(tabId) {
   if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
     if(typeof showToast === 'function') showToast("ACCESS DENIED", "Fitur ini EKSKLUSIF hanya untuk Moderator!", "error"); switchTab('weapon-shop'); return;
   }
+  if (tabId === 'backup-audit' && !isDeveloper(rank)) {
+    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Backup & Audit Log hanya dapat diakses Developer!", "error"); switchTab('weapon-shop'); return;
+  }
 
   const allNavButtons = document.querySelectorAll('.nav-btn');
   allNavButtons.forEach(btn => {
     const targetTab = btn.getAttribute('data-tab'); const iconName = typeof getLucideIconForSubmenu === 'function' ? getLucideIconForSubmenu(targetTab) : 'box';
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none";
+    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
     if (btn.style.display !== 'none') {
         let iconEl = btn.querySelector('[data-lucide]');
         if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
@@ -4382,14 +4614,22 @@ function switchTab(tabId) {
   const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
   if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
 
-  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.add('hidden');
+    panel.style.setProperty('display', 'none', 'important');
+  });
   const titleMap = {
     'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and monitor stock.'], 'release-outstanding': ['Release Held Balance', 'Manage pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of transactions.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot to validate the log.'], 'metal-scrap': ['Metal Scrap Inventory', 'Official records of scrap metal.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage promo codes.'], 'account-manager': ['Account Login Credentials', 'Manage login username and password.'], 'blacklist-manager': ['Account Blacklist Control', 'Manage the blacklist and freeze accounts.']
   };
+  titleMap['backup-audit'] = ['Backup & Audit Log', 'Secure application data and monitor moderator activity.'];
   const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
   const viewTitle = document.getElementById('view-title'); if(viewTitle) viewTitle.innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
   const viewSub = document.getElementById('view-subtitle'); if(viewSub) viewSub.innerText = info[1];
-  const target = document.getElementById('tab-' + tabId); if (target) target.classList.remove('hidden');
+  const target = document.getElementById('tab-' + tabId);
+  if (target) {
+    target.classList.remove('hidden');
+    target.style.setProperty('display', 'block', 'important');
+  }
   
   const floatCartBtn = document.getElementById('floating-cart-btn');
   if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
@@ -4404,6 +4644,7 @@ function switchTab(tabId) {
   if (tabId === 'release-outstanding' && typeof renderReleaseOutstanding === 'function') renderReleaseOutstanding();
   if (tabId === 'vault-history' && typeof renderVaultHistory === 'function') renderVaultHistory(true);
   if (tabId === 'voucher-manager' && typeof renderVoucherManager === 'function') renderVoucherManager();
+  if (tabId === 'backup-audit' && typeof renderAuditLog === 'function') renderAuditLog();
   if (tabId === 'stock-proof' && typeof renderStockProofHistory === 'function') {
     renderStockProofHistory();
     const dateAuto = document.getElementById('proof-date-auto'); if(dateAuto) dateAuto.value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
@@ -4479,9 +4720,12 @@ function renderTonCatalog() {
   const allUsers = Object.keys(savedProfiles);
 
   const filteredUsers = allUsers.filter(user => {
+    const profile = savedProfiles[user] || {};
+    if (user.toLowerCase() === 'developer' || String(profile.job || '').toLowerCase() === 'developer') return false;
+
     const tabSaatIni = String(typeof currentCatalogTab !== 'undefined' ? currentCatalogTab : 'All').toLowerCase().trim();
     if (tabSaatIni.includes('all')) return true;
-    const grupUser = String(savedProfiles[user].groupType || 'Family').toLowerCase().trim();
+    const grupUser = String(profile.groupType || 'Family').toLowerCase().trim();
     return grupUser === tabSaatIni;
   });
 
@@ -4646,272 +4890,274 @@ window.logout = function() {
 };
 
 
-// ============================================================================
-// 💾 KODE MASTER PROFIL IC: OVERRIDE TOTAL (ANTI-AMNESIA & MULTI-AKUN)
-// ============================================================================
+// Mengambil elemen yang dibutuhkan
+const themeToggleBtn = document.getElementById('theme-toggle');
+const themeIcon = document.getElementById('theme-icon');
+const themeText = document.getElementById('theme-text');
+const htmlElement = document.documentElement; // Merujuk ke tag <html>
 
-window.saveProfile = function(event) {
-    if (event) event.preventDefault();
-    if (typeof currentLoggedInUser === 'undefined' || !currentLoggedInUser) return;
+// 1. Cek apakah pengguna sudah pernah memilih tema sebelumnya
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme && themeIcon && themeText) {
+    htmlElement.setAttribute('data-theme', savedTheme);
+    updateButtonUI(savedTheme);
+}
+
+// 2. Event Listener saat tombol diklik
+if (themeToggleBtn && themeIcon && themeText) themeToggleBtn.addEventListener('click', () => {
+    // Cek tema yang sedang aktif saat ini
+    const currentTheme = htmlElement.getAttribute('data-theme');
     
-    const lowerUser = currentLoggedInUser.toLowerCase();
-    const tabProfile = document.getElementById('tab-profile');
-    if (!tabProfile) return;
+    // Tentukan tema baru
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
     
-    // Cari semua input teks di halaman profil
-    const inputs = tabProfile.querySelectorAll('input[type="text"], input[type="url"]');
-    const nameInput = document.getElementById('profile-name') || inputs[0];
-    const avatarInput = document.getElementById('profile-avatar') || inputs[1];
+    // Terapkan tema baru ke HTML
+    htmlElement.setAttribute('data-theme', newTheme);
     
-    // Panggil brankas LAMA agar data akun lain tidak terhapus
-    let brankas = JSON.parse(localStorage.getItem('ton_all_profiles') || '{}');
+    // Simpan pilihan ke localStorage agar tidak hilang saat di-refresh
+    localStorage.setItem('theme', newTheme); 
     
-    // Pastikan slot untuk akun ini tersedia
-    if (!brankas[lowerUser]) {
-        brankas[lowerUser] = { job: (typeof currentUserRole !== 'undefined' ? currentUserRole : 'Soldiers') };
-    }
-    
-    // Perbarui HANYA data milik akun ini
-    if (nameInput && nameInput.value.trim() !== '') brankas[lowerUser].name = nameInput.value;
-    if (avatarInput && avatarInput.value.trim() !== '') brankas[lowerUser].avatar = avatarInput.value;
-    
-    // KUNCI KEMBALI KE BRANKAS BROWSER
-    localStorage.setItem('ton_all_profiles', JSON.stringify(brankas));
-    window.savedProfiles = brankas; // Sinkronisasi ke variabel global
-    
-    // Munculkan notifikasi
-    if (typeof showToast === 'function') showToast("PROFILE SECURED", "Data Identitas berhasil disimpan ke memori permanen.", "success");
-    
-    // Update foto di pojok kiri bawah (Sidebar) secara instan
-    const sidebarName = document.querySelector('.sidebar-user-name, #sidebar-user-name, #user-name-display') || document.querySelector('div.font-bold.text-white.text-sm');
-    const sidebarAvatar = document.querySelector('.sidebar-user-avatar, #sidebar-user-avatar, #user-avatar-display') || document.querySelector('.w-10.h-10.rounded-full img');
-    if (sidebarName && nameInput && nameInput.value) sidebarName.innerText = nameInput.value.toUpperCase();
-    if (sidebarAvatar && avatarInput && avatarInput.value) sidebarAvatar.src = avatarInput.value;
-    
-    // Update foto preview di dalam halaman profil itu sendiri
-    const previewImg = tabProfile.querySelector('img');
-    if (previewImg && avatarInput && avatarInput.value) previewImg.src = avatarInput.value;
-};
-
-window.renderProfilePage = function() {
-    if (typeof currentLoggedInUser === 'undefined' || !currentLoggedInUser) return;
-    
-    const lowerUser = currentLoggedInUser.toLowerCase();
-    
-    // Bongkar brankas
-    const brankas = JSON.parse(localStorage.getItem('ton_all_profiles') || '{}');
-    const profilSaya = brankas[lowerUser] || {};
-    
-    const tabProfile = document.getElementById('tab-profile');
-    if (!tabProfile) return;
-    
-    const inputs = tabProfile.querySelectorAll('input[type="text"], input[type="url"]');
-    const nameInput = document.getElementById('profile-name') || inputs[0];
-    const avatarInput = document.getElementById('profile-avatar') || inputs[1];
-    const previewImg = tabProfile.querySelector('img');
-    
-    // Isi otomatis kolom input dengan data yang tersimpan
-    if (nameInput) nameInput.value = profilSaya.name || '';
-    if (avatarInput) avatarInput.value = profilSaya.avatar || '';
-    
-    // Tampilkan foto jika ada, jika kosong gunakan foto default
-    if (previewImg) {
-        previewImg.src = profilSaya.avatar && profilSaya.avatar.trim() !== '' 
-            ? profilSaya.avatar 
-            : `https://api.dicebear.com/7.x/avataaars/svg?seed=${lowerUser}`;
-    }
-};
-
-// Pastikan tombol Save di halaman profil benar-benar memicu fungsi di atas
-setInterval(() => {
-    const tabProfile = document.getElementById('tab-profile');
-    if (tabProfile) {
-        const btnSave = tabProfile.querySelector('button'); 
-        // Cegat tombol jika belum dicegat
-        if (btnSave && !btnSave.dataset.bajak) {
-            btnSave.dataset.bajak = "true"; // Penanda agar tidak diulang-ulang
-            btnSave.onclick = window.saveProfile;
-        }
-    }
-}, 1000);
-
-// ============================================================================
-// 🛡️ ADVANCED HIERARCHY SHIELD: ATURAN MUTLAK DON & MODERATOR
-// ============================================================================
-
-setInterval(() => {
-    if (typeof getUserRank !== 'function' || typeof currentLoggedInUser === 'undefined' || !currentLoggedInUser) return;
-
-    const myRank = String(getUserRank()).toLowerCase().trim();
-    const isMod = (myRank === 'moderator');
-    const isDon = (myRank === 'don');
-    const myUsername = currentLoggedInUser.toLowerCase();
-
-    // Cari semua baris data di tabel
-    const rows = document.querySelectorAll('tr'); 
-
-    rows.forEach(row => {
-        // Cari elemen dropdown dan tombol
-        const selects = row.querySelectorAll('select');
-        const rankSelect = selects.length > 1 ? selects[1] : selects[0]; // Dropdown jabatan biasanya yg kedua
-        const buttons = row.querySelectorAll('button');
-        
-        if (rankSelect || buttons.length > 0) {
-            // Cek jabatan target di baris ini
-            const rowRankText = rankSelect ? rankSelect.value.toLowerCase() : row.innerText.toLowerCase();
-            const isRowMod = rowRankText.includes('moderator');
-            const isRowDon = rowRankText.includes('don');
-
-            // Cek apakah ini baris milik akun sendiri
-            const usernameCell = row.querySelector('td');
-            const rowUsername = usernameCell ? usernameCell.innerText.toLowerCase() : '';
-            const isMyOwnRow = rowUsername.includes(myUsername);
-
-            // ----------------------------------------------------------------
-            // ATURAN 1: Sembunyikan Opsi "Moderator" di Dropdown dari Non-Mod
-            // ----------------------------------------------------------------
-            if (rankSelect && !isMod) {
-                Array.from(rankSelect.options).forEach(opt => {
-                    const optVal = opt.value.toLowerCase();
-                    // Don tidak boleh melihat opsi Moderator. (Hanya Mod yang bisa bikin Mod baru)
-                    if (optVal === 'moderator' || (optVal === 'don' && !isDon)) {
-                        opt.disabled = true;
-                        opt.style.display = 'none';
-                    }
-                });
-            }
-
-            // ----------------------------------------------------------------
-            // ATURAN 2: Mengunci Baris (Gembok Data Atasan)
-            // ----------------------------------------------------------------
-            let shouldLock = false;
-
-            if (!isMod) {
-                if (isRowMod) {
-                    shouldLock = true; // Non-Mod (termasuk Don) TIDAK BISA sentuh Mod
-                } else if (isDon && isRowDon && !isMyOwnRow) {
-                    shouldLock = true; // Don TIDAK BISA sentuh Don lain (hanya bisa ubah dirinya sendiri)
-                }
-            }
-
-            // Eksekusi Penguncian
-            if (shouldLock) {
-                // Matikan semua dropdown di baris ini
-                selects.forEach(sel => sel.disabled = true);
-
-                // Matikan dan buramkan semua tombol (Update / Hapus)
-                buttons.forEach(btn => {
-                    btn.disabled = true;
-                    btn.style.opacity = '0.3';
-                    btn.style.cursor = 'not-allowed';
-                    
-                    // Timpa klik dengan peringatan
-                    btn.onclick = function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if(typeof showToast === 'function') {
-                            showToast("ACCESS DENIED", "Otoritas Anda tidak cukup untuk mengubah data ini!", "error");
-                        }
-                    };
-                });
-            }
-        }
-    });
-}, 1000); // Robot berpatroli setiap 1 detik
-// ============================================================================
-// 🛡️ DATA GUARDIAN: PROTEKSI MUTLAK FOTO & NAMA PROFIL (ANTI-RESET)
-// ============================================================================
-
-(function() {
-    // 1. Mencegat sistem saat mencoba menyimpan ke Local Storage
-    const fungsiSetItemAsli = localStorage.setItem;
-    
-    localStorage.setItem = function(key, value) {
-        if (key === 'ton_all_profiles') {
-            try {
-                const dataBaruDiterima = JSON.parse(value);
-                const dataLamaDiBrankas = JSON.parse(localStorage.getItem('ton_all_profiles') || '{}');
-                
-                // 2. Jaga agar properti 'avatar' dan 'name' tidak dihilangkan oleh sistem bawaan
-                for (const username in dataBaruDiterima) {
-                    if (dataLamaDiBrankas[username]) {
-                        // Jika di brankas ada foto tapi di data baru mau dihapus, masukkan kembali fotonya!
-                        if (dataLamaDiBrankas[username].avatar && !dataBaruDiterima[username].avatar) {
-                            dataBaruDiterima[username].avatar = dataLamaDiBrankas[username].avatar;
-                        }
-                        // Lakukan hal yang sama untuk nama IC
-                        if (dataLamaDiBrankas[username].name && !dataBaruDiterima[username].name) {
-                            dataBaruDiterima[username].name = dataLamaDiBrankas[username].name;
-                        }
-                    }
-                }
-                
-                // 3. Timpa nilai yang akan disave dengan data yang sudah diselamatkan
-                value = JSON.stringify(dataBaruDiterima);
-                
-                // Sinkronisasi ke sistem bawaan
-                if (typeof window.savedProfiles !== 'undefined') {
-                    window.savedProfiles = dataBaruDiterima;
-                }
-            } catch(e) {
-                console.error("Guardian Error:", e);
-            }
-        }
-        // Lanjutkan proses penyimpanan ke memori browser
-        fungsiSetItemAsli.apply(this, arguments);
-    };
-})();
-
-// ============================================================================
-// 🔄 AUTO-REFRESH UI: MEMAKSA FOTO MUNCUL DI MENU SAMPING SAAT LOGIN
-// ============================================================================
-
-setInterval(() => {
-    if (typeof currentLoggedInUser !== 'undefined' && currentLoggedInUser) {
-        const brankas = JSON.parse(localStorage.getItem('ton_all_profiles') || '{}');
-        const profilSaya = brankas[currentLoggedInUser.toLowerCase()];
-        
-        if (profilSaya) {
-            const sidebarAvatar = document.querySelector('.sidebar-user-avatar, #sidebar-user-avatar, #user-avatar-display') || document.querySelector('.w-10.h-10.rounded-full img');
-            const sidebarName = document.querySelector('.sidebar-user-name, #sidebar-user-name, #user-name-display') || document.querySelector('div.font-bold.text-white.text-sm');
-            
-            // Paksa ganti foto jika foto di layar berbeda dengan foto di brankas
-            if (sidebarAvatar && profilSaya.avatar && sidebarAvatar.src !== profilSaya.avatar) {
-                sidebarAvatar.src = profilSaya.avatar;
-            }
-            // Paksa ganti nama
-            if (sidebarName && profilSaya.name && sidebarName.innerText !== profilSaya.name.toUpperCase()) {
-                sidebarName.innerText = profilSaya.name.toUpperCase();
-            }
-        }
-    }
-}, 1500); // Mengecek setiap 1.5 detik
-
-// ============================================================================
-// ☁️ FIREBASE SYNC KICKER: MEMAKSA UPLOAD PROFIL KE CLOUD
-// ============================================================================
-
-document.addEventListener('click', function(e) {
-    const teksTombol = (e.target.innerText || '').toLowerCase();
-    const idTombol = (e.target.id || '').toLowerCase();
-    
-    // Jika tombol Simpan Profil diklik
-    if (teksTombol.includes('simpan') || teksTombol.includes('save') || idTombol.includes('save')) {
-        
-        // Hentikan website agar tidak auto-refresh (jika tombolnya ada di dalam Form)
-        e.preventDefault(); 
-        
-        setTimeout(() => {
-            // Mencoba memicu semua kemungkinan nama fungsi sinkronisasi Firebase di web Anda
-            console.log("Mencoba sinkronisasi ke Firebase...");
-            try {
-                if (typeof syncData === 'function') syncData();
-                else if (typeof saveToFirebase === 'function') saveToFirebase();
-                else if (typeof updateFirebase === 'function') updateFirebase();
-                else if (typeof saveGlobalState === 'function') saveGlobalState();
-            } catch(err) {
-                console.log("Sync trigger bypassed.");
-            }
-        }, 800); // Beri waktu sistem menyimpan ke memori lokal dulu, baru lempar ke Cloud
-    }
+    // Perbarui teks dan ikon tombol
+    updateButtonUI(newTheme);
 });
+
+// 3. Fungsi untuk mengubah tampilan tombol
+function updateButtonUI(theme) {
+  if (!themeIcon || !themeText) return;
+  if (theme === 'light') {
+        themeIcon.textContent = '🌙';
+        themeText.textContent = 'Dark Mode';
+    } else {
+        themeIcon.textContent = '☀️';
+        themeText.textContent = 'Light Mode';
+    }
+}
+
+function recordAuditLog(action, details = '') {
+  const actor = currentLoggedInUser || 'SYSTEM';
+  auditLogs = Array.isArray(auditLogs) ? auditLogs : [];
+  auditLogs.unshift({
+    id: `AUD-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: new Date().toISOString(),
+    actor,
+    role: currentUserRole || 'SYSTEM',
+    action,
+    details
+  });
+  auditLogs = auditLogs.slice(0, 500);
+  saveAppData();
+  if (typeof renderAuditLog === 'function') renderAuditLog();
+}
+
+function exportAppBackup() {
+  if (!isDeveloper(getUserRank())) {
+    showToast('ACCESS DENIED', 'Backup hanya dapat dibuat oleh Developer.', 'error');
+    return;
+  }
+  saveAppData();
+  const backup = getSafeStorage('ton_global_state');
+  if (!backup) {
+    showToast('BACKUP GAGAL', 'Data aplikasi belum tersedia untuk diekspor.', 'error');
+    return;
+  }
+
+  const payload = {
+    backupVersion: 1,
+    exportedAt: new Date().toISOString(),
+    exportedBy: currentLoggedInUser || 'SYSTEM',
+    data: backup
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `ton-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  recordAuditLog('BACKUP_EXPORTED', 'Backup data aplikasi diunduh.');
+  showToast('BACKUP BERHASIL', 'File backup JSON berhasil diunduh.', 'success');
+}
+
+function handleBackupImport(event) {
+  if (!isDeveloper(getUserRank())) {
+    if (event?.target) event.target.value = '';
+    showToast('ACCESS DENIED', 'Restore backup hanya dapat dilakukan oleh Developer.', 'error');
+    return;
+  }
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      const importedData = payload?.data || payload;
+      const requiredFields = ['adminTransactions', 'vaultInventory', 'savedProfiles'];
+      if (!importedData || typeof importedData !== 'object' || !requiredFields.every(field => field in importedData)) {
+        throw new Error('Format backup tidak valid.');
+      }
+      applyGlobalState(importedData);
+      saveAppData();
+      recordAuditLog('BACKUP_IMPORTED', `Backup ${file.name} dipulihkan.`);
+      refreshAllUIDisplays();
+      showToast('RESTORE BERHASIL', 'Data backup berhasil dipulihkan dan disinkronkan.', 'success');
+    } catch (error) {
+      showToast('RESTORE GAGAL', error.message || 'File backup tidak dapat dibaca.', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearAuditLogs() {
+  if (!isDeveloper(getUserRank())) {
+    showToast('ACCESS DENIED', 'Hanya Developer yang dapat menghapus audit log.', 'error');
+    return;
+  }
+  showCustomConfirm('HAPUS AUDIT LOG', 'Semua catatan audit akan dihapus permanen. Lanjutkan?', () => {
+    auditLogs = [];
+    saveAppData();
+    renderAuditLog();
+    showToast('AUDIT LOG DIHAPUS', 'Seluruh catatan audit telah dihapus.', 'success');
+  });
+}
+
+function renderAuditLog() {
+  const table = document.getElementById('audit-log-table');
+  const count = document.getElementById('audit-log-count');
+  if (!table) return;
+  const query = (document.getElementById('audit-log-search')?.value || '').toLowerCase();
+  const rows = (Array.isArray(auditLogs) ? auditLogs : []).filter(log =>
+    [log.actor, log.role, log.action, log.details].join(' ').toLowerCase().includes(query)
+  );
+  if (count) count.textContent = `${rows.length} log`;
+  table.innerHTML = rows.length ? rows.map(log => `
+    <tr>
+      <td class="p-3.5 text-zinc-400 whitespace-nowrap">${new Date(log.timestamp).toLocaleString('id-ID')}</td>
+      <td class="p-3.5 font-semibold text-white">${escapeHtml(log.actor)}</td>
+      <td class="p-3.5 text-zinc-400">${escapeHtml(log.role)}</td>
+      <td class="p-3.5"><span class="px-2 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">${escapeHtml(log.action)}</span></td>
+      <td class="p-3.5 text-zinc-300">${escapeHtml(log.details || '-')}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="p-8 text-center text-zinc-500">Belum ada aktivitas tercatat.</td></tr>';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+}
+
+function postInternalMessage() {
+  const input = document.getElementById('internal-message-input');
+  const message = input?.value.trim();
+  if (!message) {
+    showToast('PESAN KOSONG', 'Tulis pesan sebelum mengirim.', 'error');
+    return;
+  }
+
+  internalMessages = Array.isArray(internalMessages) ? internalMessages : [];
+  internalMessages.unshift({
+    id: `MSG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    message,
+    author: currentLoggedInUser || 'SYSTEM',
+    role: currentUserRole || 'Member',
+    createdAt: new Date().toISOString()
+  });
+  internalMessages = internalMessages.slice(0, 300);
+  input.value = '';
+  saveAppData();
+  recordAuditLog('MESSAGE_POSTED', 'Pesan baru ditambahkan ke internal message board.');
+  renderInternalMessages();
+  showToast('PESAN TERKIRIM', 'Pesan berhasil dibagikan ke anggota.', 'success');
+}
+
+function deleteInternalMessage(messageId) {
+  if (!isTopAdmin(getUserRank())) {
+    showToast('ACCESS DENIED', 'Hanya Moderator yang dapat menghapus pesan.', 'error');
+    return;
+  }
+  const message = internalMessages.find(item => item.id === messageId);
+  internalMessages = internalMessages.filter(item => item.id !== messageId);
+  saveAppData();
+  recordAuditLog('MESSAGE_DELETED', `Pesan dari ${message?.author || 'unknown'} dihapus.`);
+  renderInternalMessages();
+}
+
+function renderInternalMessages() {
+  const list = document.getElementById('internal-message-list');
+  const count = document.getElementById('internal-message-count');
+  if (!list) return;
+  const viewTitle = document.getElementById('view-title');
+  const viewSubtitle = document.getElementById('view-subtitle');
+  if (viewTitle && !document.getElementById('tab-internal-board')?.classList.contains('hidden')) {
+    viewTitle.innerHTML = '<i data-lucide="message-square" class="w-5 h-5 text-cyan-400 inline"></i> Internal Message Board';
+    if (viewSubtitle) viewSubtitle.textContent = 'Komunikasi internal untuk pengumuman dan koordinasi anggota.';
+  }
+  const query = (document.getElementById('internal-message-search')?.value || '').toLowerCase();
+  const messages = (Array.isArray(internalMessages) ? internalMessages : []).filter(item =>
+    `${item.author} ${item.role} ${item.message}`.toLowerCase().includes(query)
+  );
+  if (count) count.textContent = `${messages.length} pesan`;
+  list.innerHTML = messages.length ? messages.map(item => `
+    <article class="bg-[#131622] border border-[#1e2230] rounded-xl p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0">${escapeHtml((item.author || '?').slice(0, 2).toUpperCase())}</div>
+          <div class="min-w-0"><p class="text-xs font-bold text-white truncate">${escapeHtml(item.author)}</p><p class="text-[10px] text-cyan-400 uppercase">${escapeHtml(item.role)}</p></div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0"><time class="text-[10px] text-zinc-500">${new Date(item.createdAt).toLocaleString('id-ID')}</time>${isTopAdmin(getUserRank()) ? `<button onclick="deleteInternalMessage('${item.id}')" class="text-zinc-500 hover:text-red-400" title="Hapus pesan"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}</div>
+      </div>
+      <p class="text-xs text-zinc-300 leading-relaxed mt-3 whitespace-pre-wrap break-words">${escapeHtml(item.message)}</p>
+    </article>`).join('') : '<div class="border border-dashed border-[#1e2230] rounded-xl p-8 text-center text-xs text-zinc-500">Belum ada pesan internal.</div>';
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function triggerFullSystemReset() {
+  if (!isDeveloper(getUserRank())) {
+    showToast('ACCESS DENIED', 'Hanya Developer yang dapat menghapus seluruh data aplikasi.', 'error');
+    return;
+  }
+
+  showCustomConfirm(
+    'FACTORY RESET 1/2',
+    'PERINGATAN: Semua data aplikasi akan dihapus, termasuk akun custom, profil, inventory, transaksi, pesan, voucher, blacklist, saldo, dan audit log. Buat backup terlebih dahulu. Lanjutkan?',
+    () => {
+      setTimeout(() => showCustomConfirm(
+        'FACTORY RESET 2/2',
+        'TINDAKAN INI TIDAK DAPAT DIBATALKAN. Seluruh data Firebase dan cache lokal akan dihapus permanen. Anda benar-benar yakin?',
+        () => {
+          const storageKeys = [
+            'ton_global_state', 'ton_admin_transactions', 'ton_org_leaderboard',
+            'ton_vault_balance', 'ton_vault_inventory', 'ton_vouchers',
+            'ton_metal_scrap', 'ton_custom_accounts', 'ton_stock_proof_logs',
+            'ton_audit_logs', 'ton_vault_lockdown', 'ton_blacklisted_users',
+            'ton_all_profiles', 'ton_current_session'
+          ];
+          localStorage.setItem('ton_factory_reset', 'true');
+          storageKeys.forEach(key => localStorage.removeItem(key));
+
+          adminTransactions = [];
+          orgLeaderboard = [];
+          vaultInventory = [];
+          vaultBalance = 0;
+          syndVouchers = [];
+          metalScrapLogs = [];
+          customAccounts = {};
+          stockProofLogs = [];
+          auditLogs = [];
+          internalMessages = [];
+          isVaultLockdown = false;
+          blacklistedUsers = [];
+          savedProfiles = {};
+
+          const clearCloud = db ? db.ref('ton_global_state').remove() : Promise.resolve();
+          clearCloud.then(() => {
+            showToast('FACTORY RESET SELESAI', 'Seluruh data aplikasi telah dihapus.', 'success');
+            setTimeout(() => location.reload(), 1200);
+          }).catch(error => {
+            console.error('Factory reset Firebase error:', error);
+            showToast('RESET GAGAL', 'Cache lokal sudah dihapus, tetapi Firebase gagal dihapus.', 'error');
+          });
+        }
+      ), 300);
+    }
+  );
+}
