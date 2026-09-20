@@ -1,5 +1,5 @@
-<!DOCTYPE html>
-<html lang="id" class="dark">
+aAxa<!DOCTYPE html>
+<html lang="id" class="dark" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,7 +36,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Custom CSS Link -->
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260913-rbac2">
 </head>
 <body class="bg-[#090a0f] text-gray-200 min-h-screen flex flex-col antialiased selection:bg-red-600 selection:text-white font-sans">
 
@@ -214,6 +214,10 @@
             <i data-lucide="user" class="w-4 h-4 text-blue-400"></i>
             <span>Profile Account IC</span>
           </button>
+          <button onclick="switchTab('internal-board'); renderInternalMessages()" data-tab="internal-board" class="nav-btn w-full flex items-center gap-3 px-3 py-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition">
+            <i data-lucide="message-square" class="w-4 h-4 text-cyan-400"></i>
+            <span>Internal Message Board</span>
+          </button>
         </div>
 
    <!-- 3. TRANSACTION & ORDER -->
@@ -298,10 +302,19 @@
             <i data-lucide="ticket" class="w-4 h-4 text-purple-400"></i>
             <span>Manage Voucher</span>
           </button>
+
+          <button onclick="switchTab('backup-audit')" data-tab="backup-audit" data-developer-only="true" style="display: none !important;" class="developer-only hidden nav-btn w-full flex items-center gap-3 px-3 py-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-xl transition">
+            <i data-lucide="database-backup" class="w-4 h-4 text-emerald-400"></i>
+            <span>Backup & Audit Log</span>
+          </button>
           
-          <button onclick="triggerSystemReset()" class="w-full flex items-center gap-3 px-3 py-2 text-red-400 hover:text-white hover:bg-red-600 rounded-xl transition text-xs font-semibold mt-2 border border-red-500/20">
+          <button onclick="triggerSystemReset()" style="display: none !important;" class="developer-only hidden w-full flex items-center gap-3 px-3 py-2 text-red-400 hover:text-white hover:bg-red-600 rounded-xl transition text-xs font-semibold mt-2 border border-red-500/20">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
             <span>Reset all history</span>
+          </button>
+          <button onclick="triggerFullSystemReset()" style="display: none !important;" class="developer-only hidden w-full flex items-center gap-3 px-3 py-2 text-red-300 hover:text-white hover:bg-red-700 rounded-xl transition text-xs font-semibold border border-red-500/40">
+            <i data-lucide="bomb" class="w-4 h-4"></i>
+            <span>Factory Reset All Data</span>
           </button>
         </div>
 
@@ -409,6 +422,37 @@
           <div class="bg-[#0e1017] border border-[#1e2230] p-6 rounded-2xl">
             <h3 class="text-base font-bold text-white mb-4">Order Processing Status</h3>
             <div id="my-orders-list" class="space-y-3 text-xs"></div>
+          </div>
+        </div>
+
+        <!-- INTERNAL MESSAGE BOARD -->
+        <div id="tab-internal-board" class="tab-panel hidden space-y-6">
+          <div class="bg-[#0e1017] border border-[#1e2230] rounded-2xl p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1e2230] pb-4 gap-3">
+              <div class="flex items-center gap-2.5">
+                <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg"><i data-lucide="message-square" class="w-5 h-5"></i></div>
+                <div>
+                  <h2 class="text-base font-bold text-white">Internal Message Board</h2>
+                  <p class="text-xs text-zinc-400 mt-0.5">Papan komunikasi internal untuk pengumuman dan koordinasi anggota.</p>
+                </div>
+              </div>
+              <span id="internal-message-count" class="px-2.5 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 rounded-full text-[10px] font-semibold uppercase">0 pesan</span>
+            </div>
+
+            <div class="bg-[#131622] border border-[#1e2230] rounded-xl p-4 space-y-3">
+              <textarea id="internal-message-input" maxlength="500" rows="3" placeholder="Tulis pengumuman atau pesan untuk anggota..." class="w-full bg-[#0e1017] border border-[#1e2230] text-white text-xs rounded-xl px-3.5 py-3 resize-y focus:outline-none focus:border-cyan-500"></textarea>
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-[11px] text-zinc-500">Maksimal 500 karakter</span>
+                <button onclick="postInternalMessage()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"><i data-lucide="send" class="w-3.5 h-3.5"></i> Kirim Pesan</button>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+              <input id="internal-message-search" oninput="renderInternalMessages()" placeholder="Cari pesan atau nama pengirim..." class="flex-1 bg-[#131622] border border-[#1e2230] text-white text-xs rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-cyan-500">
+              <button onclick="renderInternalMessages()" class="bg-[#131622] border border-[#1e2230] text-zinc-300 hover:text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh</button>
+            </div>
+
+            <div id="internal-message-list" class="space-y-3"></div>
           </div>
         </div>
 
@@ -1300,6 +1344,51 @@
           </div>
         </div>
 
+        <!-- 15. BACKUP & AUDIT LOG -->
+        <div id="tab-backup-audit" style="display: none !important;" class="tab-panel developer-only hidden space-y-6">
+          <div class="bg-[#0e1017] border border-[#1e2230] rounded-2xl p-6 space-y-6">
+            <div class="border-b border-[#1e2230] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5">
+                <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg"><i data-lucide="database-backup" class="w-5 h-5"></i></div>
+                <div>
+                  <h2 class="text-base font-bold text-white">Backup & Audit Log</h2>
+                  <p class="text-xs text-zinc-400 mt-0.5">Amankan data aplikasi dan pantau aktivitas moderator.</p>
+                </div>
+              </div>
+              <span id="audit-log-count" class="px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-full text-[10px] font-semibold uppercase">0 log</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="bg-[#131622] border border-[#1e2230] rounded-xl p-5">
+                <div class="flex items-center gap-2 mb-2"><i data-lucide="download" class="w-4 h-4 text-blue-400"></i><h3 class="text-sm font-bold text-white">Export Backup</h3></div>
+                <p class="text-xs text-zinc-400 mb-4">Unduh seluruh data marketplace dalam format JSON.</p>
+                <button onclick="exportAppBackup()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i> Download Backup</button>
+              </div>
+              <div class="bg-[#131622] border border-[#1e2230] rounded-xl p-5">
+                <div class="flex items-center gap-2 mb-2"><i data-lucide="upload" class="w-4 h-4 text-amber-400"></i><h3 class="text-sm font-bold text-white">Restore Backup</h3></div>
+                <p class="text-xs text-zinc-400 mb-4">Pulihkan data dari file JSON backup sebelumnya.</p>
+                <input type="file" id="backup-file-input" accept="application/json,.json" onchange="handleBackupImport(event)" class="block w-full text-xs text-zinc-400 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-amber-500 file:text-black file:font-semibold file:cursor-pointer">
+              </div>
+            </div>
+
+            <div class="bg-[#131622] border border-[#1e2230] rounded-xl overflow-hidden">
+              <div class="p-4 border-b border-[#1e2230] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div><h3 class="text-sm font-bold text-white">Activity Audit Log</h3><p class="text-xs text-zinc-500 mt-0.5">Menyimpan 500 aktivitas terbaru.</p></div>
+                <div class="flex items-center gap-2">
+                  <input id="audit-log-search" oninput="renderAuditLog()" placeholder="Cari aktivitas..." class="bg-[#0e1017] border border-[#1e2230] text-white text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+                  <button onclick="clearAuditLogs()" class="bg-red-600/10 border border-red-500/20 text-red-400 hover:bg-red-600 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition">Clear</button>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs min-w-[760px]">
+                  <thead class="bg-[#0e1017] text-zinc-500 font-semibold uppercase border-b border-[#1e2230] text-[11px]"><tr><th class="p-3.5">Time</th><th class="p-3.5">Actor</th><th class="p-3.5">Role</th><th class="p-3.5">Action</th><th class="p-3.5">Details</th></tr></thead>
+                  <tbody id="audit-log-table" class="divide-y divide-[#1e2230]"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
   </div>
@@ -1588,7 +1677,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <!-- Skrip asli website Anda -->
-<script src="script.js"></script>
+<script src="script.js?v=20260913-hide-developer3"></script>
 
 
 <!-- KUSTOM INPUT MODAL (PENGGANTI PROMPT BAWAAN BROWSER) -->
@@ -1616,3 +1705,49 @@
 
 </body>
 </html>
+
+
+<!-- Tambahkan tombol ini di struktur navigasi Anda -->
+<script>
+  // Menunggu sampai seluruh elemen HTML selesai dimuat
+  document.addEventListener('DOMContentLoaded', () => {
+      const themeToggleBtn = document.getElementById('theme-toggle');
+      const themeIcon = document.getElementById('theme-icon');
+      const themeText = document.getElementById('theme-text');
+      const htmlElement = document.documentElement;
+
+      // Cek jika tombol tidak ditemukan untuk mencegah error
+      if (!themeToggleBtn) {
+          console.error("Tombol dengan ID 'theme-toggle' tidak ditemukan di HTML!");
+          return;
+      }
+
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        htmlElement.setAttribute('data-theme', savedTheme);
+        updateButtonUI(savedTheme);
+
+      themeToggleBtn.addEventListener('click', () => {
+          const currentTheme = htmlElement.getAttribute('data-theme');
+          const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+          
+          htmlElement.setAttribute('data-theme', newTheme);
+          localStorage.setItem('theme', newTheme); 
+          updateButtonUI(newTheme);
+      });
+
+      function updateButtonUI(theme) {
+          if (theme === 'light') {
+              themeIcon.textContent = '🌙';
+              themeText.textContent = 'Dark Mode';
+          } else {
+              themeIcon.textContent = '☀️';
+              themeText.textContent = 'Light Mode';
+          }
+      }
+  });
+</script>
+
+<button id="theme-toggle" class="fixed top-4 right-4 z-[400] w-8 h-8 p-0 flex items-center justify-center bg-[#0e1017] border border-[#1e2230] rounded-lg text-sm text-zinc-300 shadow-md hover:text-white hover:border-zinc-500" type="button" title="Ganti tema" aria-label="Ganti tema">
+  <span id="theme-icon" aria-hidden="true">☀️</span>
+  <span id="theme-text" class="sr-only">Light Mode</span>
+</button>
