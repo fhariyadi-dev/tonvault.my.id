@@ -1,3 +1,7 @@
+/* Developer-only controls stay hidden until RBAC explicitly grants access. */
+.developer-only:not(.developer-access) {
+  display: none !important;
+}
 /* ==========================================================================
    THE OLD NORSE (TON) - MODERN EXECUTIVE DARK STYLESHEET
    ========================================================================== */
@@ -41,4 +45,92 @@ button:disabled {
   opacity: 0.4 !important;
   cursor: not-allowed !important;
   transform: none !important;
+}
+
+
+/* Tema Gelap (Default - Sesuaikan dengan kode warna asli Anda) */
+:root {
+  --bg-main: #111315; /* Warna latar belakang utama */
+  --bg-panel: #1A1D21; /* Warna latar kartu/panel */
+  --text-primary: #FFFFFF;
+  --text-secondary: #8B949E;
+  --accent-color: #2DA042;
+  --border-color: #30363D;
+}
+
+/* Tema Terang */
+[data-theme="light"] {
+  --bg-main: #F6F8FA;
+  --bg-panel: #FFFFFF;
+  --text-primary: #1F2328;
+  --text-secondary: #656D76;
+  --accent-color: #1A7F37;
+  --border-color: #D0D7DE;
+}
+
+/* Contoh cara memanggil variabel di elemen CSS Anda */
+body {
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease; /* Memberikan efek transisi halus */
+}
+
+.dashboard-card, .sidebar {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-color);
+}
+
+body {
+  /* HAPUS: background-color: #111315; */
+  background-color: var(--bg-main); /* GUNAKAN INI */
+  color: var(--text-primary);
+}
+
+/* Tailwind colors in index.html are intentionally overridden for light mode. */
+[data-theme="light"] body,
+[data-theme="light"] #main-app,
+[data-theme="light"] main {
+  background-color: #f6f8fa !important;
+  color: #1f2328 !important;
+}
+
+[data-theme="light"] [class*="bg-[#090a0f]"],
+[data-theme="light"] [class*="bg-[#0b0c12]"],
+[data-theme="light"] [class*="bg-[#0e1017]"],
+[data-theme="light"] [class*="bg-[#131622]"] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] [class*="border-[#1e2230"] {
+  border-color: #d0d7de !important;
+}
+
+[data-theme="light"] [class*="text-white"] {
+  color: #1f2328 !important;
+}
+
+[data-theme="light"] [class*="text-zinc-200"],
+[data-theme="light"] [class*="text-zinc-300"],
+[data-theme="light"] [class*="text-zinc-400"] {
+  color: #4b5563 !important;
+}
+
+[data-theme="light"] [class*="text-zinc-500"],
+[data-theme="light"] [class*="text-zinc-600"] {
+  color: #656d76 !important;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  color: #1f2328 !important;
+}
+
+[data-theme="light"] input::placeholder {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .shadow-2xl,
+[data-theme="light"] .shadow-xl {
+  box-shadow: 0 10px 30px rgba(31, 35, 40, 0.12) !important;
 }
