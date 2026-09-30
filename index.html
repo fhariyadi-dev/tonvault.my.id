@@ -40,6 +40,11 @@
 </head>
 <body class="bg-[#090a0f] text-gray-200 min-h-screen flex flex-col antialiased selection:bg-red-600 selection:text-white font-sans">
 
+  <button id="theme-toggle" class="fixed top-4 right-4 z-[400] w-8 h-8 p-0 flex items-center justify-center bg-[#0e1017] border border-[#1e2230] rounded-lg text-sm text-zinc-300 shadow-md hover:text-white hover:border-zinc-500" type="button" title="Ganti tema" aria-label="Ganti tema">
+  <span id="theme-icon" aria-hidden="true">☀️</span>
+  <span id="theme-text" class="sr-only">Light Mode</span>
+</button>
+
   <!-- MODAL BLOKIR (SECURITY SYSTEM) -->
   <div id="blocked-modal" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
     <div class="w-full max-w-md bg-[#0e1017] border border-red-500/30 rounded-2xl shadow-2xl p-6 text-center relative overflow-hidden">
@@ -1671,14 +1676,12 @@
 
   </div>
 
-
 <!-- FIREBASE REALTIME DATABASE SDK (WAJIB DI ATAS SCRIPT.JS) -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <!-- Skrip asli website Anda -->
 <script src="script.js?v=20260913-hide-developer3"></script>
-
 
 <!-- KUSTOM INPUT MODAL (PENGGANTI PROMPT BAWAAN BROWSER) -->
 <div id="custom-prompt-backdrop" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[300] hidden flex items-center justify-center p-4 transition-opacity">
@@ -1747,7 +1750,3 @@
   });
 </script>
 
-<button id="theme-toggle" class="fixed top-4 right-4 z-[400] w-8 h-8 p-0 flex items-center justify-center bg-[#0e1017] border border-[#1e2230] rounded-lg text-sm text-zinc-300 shadow-md hover:text-white hover:border-zinc-500" type="button" title="Ganti tema" aria-label="Ganti tema">
-  <span id="theme-icon" aria-hidden="true">☀️</span>
-  <span id="theme-text" class="sr-only">Light Mode</span>
-</button>
