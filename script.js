@@ -14,13 +14,38 @@ const firebaseConfig = {
 
 let db = null;
 try {
-  if (typeof firebase !== 'undefined' && !firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
+    if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     db = firebase.database();
     console.log("🟢 FIREBASE CLOUD CONNECTED: Sistem online & tersinkronisasi.");
-  }
+
+    // --- LOGIKA PEMUATAN DATA DARI FIREBASE ---
+    if (db) {
+        db.ref('ton_global_state').once('value')
+            .then((snapshot) => {
+                const serverData = snapshot.val();
+                if (serverData) {
+                    if (serverData.customAccounts) customAccounts = serverData.customAccounts;
+                    if (serverData.savedProfiles) savedProfiles = serverData.savedProfiles;
+                    if (serverData.vaultInventory) vaultInventory = serverData.vaultInventory;
+                    if (serverData.adminTransactions) adminTransactions = serverData.adminTransactions;
+                    console.log("🟢 Data berhasil dimuat dari Firebase Cloud.");
+                }
+                firebaseSynced = true; // Buka kunci sinkronisasi
+                if (typeof initSession === 'function') initSession();
+            })
+            .catch((err) => {
+                console.error("Gagal sinkronisasi data:", err);
+                firebaseSynced = true;
+                if (typeof initSession === 'function') initSession();
+            });
+    }
+
 } catch (e) {
-  console.warn("⚠️ FIREBASE ERROR: Menggunakan penyimpanan lokal.");
+    console.warn("⚠️ FIREBASE ERROR: Menggunakan penyimpanan lokal.");
+    firebaseSynced = true;
+    if (typeof initSession === 'function') initSession();
 }
 
 const LOGS_WEBHOOK_URL = "https://discord.com/api/webhooks/1532559618579103938/inZhoEWpyoW8xJ8HwtIvNQTyWGRNWelzRz9OI2spNtOMr2_nG11Nc1LPpr1-YwrdNxAk";
