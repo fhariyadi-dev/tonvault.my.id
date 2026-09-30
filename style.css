@@ -101,7 +101,7 @@ body {
   background-color: #ffffff !important;
 }
 
-[data-theme="light"] [class*="border-[#1e2230"] {
+[data-theme="light"] [class*="border-[#1e2230]"] {
   border-color: #d0d7de !important;
 }
 
