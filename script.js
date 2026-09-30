@@ -11,7 +11,6 @@ const firebaseConfig = {
   measurementId: "G-98ZTGCYEFE"
 };
 
-
 let db = null;
 try {
     if (typeof firebase !== 'undefined' && !firebase.apps.length) {
@@ -33,19 +32,19 @@ try {
                     console.log("🟢 Data berhasil dimuat dari Firebase Cloud.");
                 }
                 firebaseSynced = true; // Buka kunci sinkronisasi
-                if (typeof initSession === 'function') initSession();
+                if (typeof initSession === 'function') initSession(currentUserRole, currentLoggedInUser, false);
             })
             .catch((err) => {
                 console.error("Gagal sinkronisasi data:", err);
                 firebaseSynced = true;
-                if (typeof initSession === 'function') initSession();
+                if (typeof initSession === 'function') initSession(currentUserRole, currentLoggedInUser, false);
             });
     }
 
 } catch (e) {
     console.warn("⚠️ FIREBASE ERROR: Menggunakan penyimpanan lokal.");
     firebaseSynced = true;
-    if (typeof initSession === 'function') initSession();
+    if (typeof initSession === 'function') initSession(currentUserRole, currentLoggedInUser, false);
 }
 
 const LOGS_WEBHOOK_URL = "https://discord.com/api/webhooks/1532559618579103938/inZhoEWpyoW8xJ8HwtIvNQTyWGRNWelzRz9OI2spNtOMr2_nG11Nc1LPpr1-YwrdNxAk";
@@ -73,8 +72,7 @@ function initEmergencyAccounts() {
     }
     if (!window.savedProfiles[user]) {
       window.savedProfiles[user] = {
-        // Tambahkan pengaman agar tidak error jika user undefined
-        name: user ? user.toUpperCase() : "UNKNOWN",
+        name: user ? String(user).toUpperCase() : "UNKNOWN",
         phone: '0812-9999',
         idcard: 'TON-9999',
         job: data.rank,
@@ -228,9 +226,7 @@ let defaultInventory = [
 let _savedInv = getSafeStorage('ton_vault_inventory');
 let vaultInventory = (_savedInv && Array.isArray(_savedInv) && _savedInv.length > 0) ? _savedInv : defaultInventory;
 
-let defaultVouchers = [
- 
-];
+let defaultVouchers = [];
 
 let _savedVouch = getSafeStorage('ton_vouchers');
 let syndVouchers = (_savedVouch && Array.isArray(_savedVouch) && _savedVouch.length > 0) ? _savedVouch : defaultVouchers;
@@ -269,11 +265,6 @@ function saveAppData() {
     savedProfiles: typeof savedProfiles !== 'undefined' ? savedProfiles : {}
   };
 
-  // KODE INI DIHAPUS/DIMATIKAN AGAR TIDAK MENIMPA SELURUH DATABASE FIREBASE
-  // if (typeof db !== 'undefined' && db) {
-  //   db.ref('ton_global_state').set(allData).catch(err => console.warn(err));
-  // }
-
   persistLocalState(allData);
 }
 
@@ -300,19 +291,9 @@ function persistLocalState(allData) {
 
 function getEmptyAppState() {
   return {
-    adminTransactions: [],
-    orgLeaderboard: [],
-    vaultInventory: [],
-    vaultBalance: 0,
-    syndVouchers: [],
-    metalScrapLogs: [],
-    customAccounts: {},
-    stockProofLogs: [],
-    auditLogs: [],
-    internalMessages: [],
-    isVaultLockdown: false,
-    blacklistedUsers: [],
-    savedProfiles: {}
+    adminTransactions: [], orgLeaderboard: [], vaultInventory: [], vaultBalance: 0,
+    syndVouchers: [], metalScrapLogs: [], customAccounts: {}, stockProofLogs: [],
+    auditLogs: [], internalMessages: [], isVaultLockdown: false, blacklistedUsers: [], savedProfiles: {}
   };
 }
 
@@ -342,7 +323,6 @@ function initCloudRealtimeSync() {
       applyGlobalState(data);
       persistLocalState(data);
     } else if (isInitialSnapshot) {
-      // Migrate data saved before realtime sync was enabled into Firebase.
       if (localStorage.getItem('ton_factory_reset') === 'true') {
         stateRef.set(getEmptyAppState()).then(() => localStorage.removeItem('ton_factory_reset'));
       } else {
@@ -383,21 +363,20 @@ function applyGlobalState(data) {
     let rawProfiles = data.savedProfiles || {};
     savedProfiles = {}; 
     
-Object.keys(rawProfiles).forEach(key => {
+    Object.keys(rawProfiles).forEach(key => {
         const p = rawProfiles[key];
-        // Pastikan objek p dan p.name ada sebelum memanggil .toUpperCase() atau .toLowerCase()
         if (p && typeof p === 'object' && p.name) {
-            const safeKey = p.name.toLowerCase();
+            const safeKey = String(p.name).toLowerCase();
             savedProfiles[safeKey] = p;
         }
     });
 
     if (customAccounts) {
         Object.keys(customAccounts).forEach(acc => {
-            const safeAcc = acc.toLowerCase();
+            const safeAcc = String(acc).toLowerCase();
             if (safeAcc && !savedProfiles[safeAcc]) {
                 savedProfiles[safeAcc] = {
-                    name: acc.toUpperCase(),
+                    name: String(acc).toUpperCase(),
                     job: customAccounts[acc].rank || 'Soldiers',
                     groupType: 'Family',
                     phone: '0812-XXXX',
@@ -511,33 +490,31 @@ function closeCustomConfirm() {
   }
 }
 
+// ============================================================================
+// 🏆 FINAL RELEASE RBAC: ATURAN HIERARKI KESELURUHAN MUTLAK (REVISI ASSOCIATES)
+// ============================================================================
+
 function getUserRank() {
-  const savedProfiles = getSafeStorage('ton_all_profiles') || {};
-  // Pastikan sistem selalu mencari dengan huruf kecil agar tidak error
-  const lowerUser = (currentLoggedInUser || '').toLowerCase(); 
-  const prof = savedProfiles[lowerUser] || {};
-  return prof.job || currentUserRole || 'Soldiers';
+  const lowerUser = String(typeof currentLoggedInUser !== 'undefined' ? currentLoggedInUser : '').toLowerCase();
+  if (typeof savedProfiles !== 'undefined' && savedProfiles[lowerUser] && savedProfiles[lowerUser].job) {
+      return savedProfiles[lowerUser].job;
+  }
+  return typeof currentUserRole !== 'undefined' && currentUserRole ? currentUserRole : 'Soldiers';
 }
 
-function isDeveloper(rank) {
-  return String(rank || '').toLowerCase().trim() === 'developer';
-}
-
-function isTopAdmin(rank) { return ['Moderator', 'Developer'].includes(rank) || isDeveloper(rank); }
-function isDonTier(rank) { return ['Moderator', 'Developer', 'Don', 'Underboss'].includes(rank) || isDeveloper(rank); }
-function isBisnisTier(rank) { return ['Moderator', 'Developer', 'Don', 'Underboss', 'Bisnis'].includes(rank) || isDeveloper(rank); }
-function isReadOnlyAdminTier(rank) { return ['Capo', 'Captain', 'Consigliere', 'Developer'].includes(rank) || isDeveloper(rank); }
-function canViewAdminPanel(rank) { return isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
-function isAssociate(rank) { return rank === 'Associates'; }
-
+function isTopAdmin(rank) { return isDeveloper(rank) || ['moderator'].includes(String(rank).toLowerCase().trim()); }
+function isDonTier(rank) { return isDeveloper(rank) || ['moderator', 'don'].includes(String(rank).toLowerCase().trim()); }
+function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
+function isReadOnlyAdminTier(rank) { return isDeveloper(rank) || ['underboss', 'consigliere', 'hood father', 'hoodfather', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
+function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
+function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
+function isDeveloper(rank) { return String(rank || '').toLowerCase().trim() === 'developer'; }
 
 function updateRBACUI() {
   const rank = getUserRank();
-  
-  document.querySelectorAll('.admin-only').forEach(el => {
-    if (canViewAdminPanel(rank)) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  });
+  const safeRank = String(rank).toLowerCase().trim();
+  const isWritable = isBisnisTier(rank); 
+  const canView = canViewAdminPanel(rank);
 
   document.querySelectorAll('.mod-only').forEach(el => {
     if (isTopAdmin(rank)) el.classList.remove('hidden');
@@ -560,22 +537,28 @@ function updateRBACUI() {
     }
   });
 
+  document.querySelectorAll('.admin-only').forEach(el => {
+    if (canView) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  });
+
+  const adminTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
+  adminTabs.forEach(tab => {
+     const btn = document.querySelector(`.nav-btn[data-tab="${tab}"]`);
+     if (btn) btn.style.display = canView ? 'flex' : 'none';
+  });
+
+  const rosterBtn = document.querySelector(`.nav-btn[data-tab="the-old-norse"]`);
+  if (rosterBtn) rosterBtn.style.display = 'flex';
+
+  const actionBars = ['inventory-action-bar', 'outstanding-action-bar', 'proof-action-bar', 'scrap-action-bar'];
+  actionBars.forEach(id => {
+      const bar = document.getElementById(id);
+      if (bar) bar.style.display = isWritable ? 'flex' : 'none';
+  });
+
   const navHq = document.getElementById('nav-group-hq');
-  if (navHq) {
-    if (isAssociate(rank)) navHq.classList.add('hidden');
-    else navHq.classList.remove('hidden');
-  }
-
-  const isWritable = isBisnisTier(rank);
-  const invBar = document.getElementById('inventory-action-bar');
-  const outBar = document.getElementById('outstanding-action-bar');
-  const proofBar = document.getElementById('proof-action-bar');
-  const scrapBar = document.getElementById('scrap-action-bar');
-
-  if (invBar) invBar.style.display = isWritable ? 'flex' : 'none';
-  if (outBar) outBar.style.display = isWritable ? 'flex' : 'none';
-  if (proofBar) proofBar.style.display = isWritable ? 'flex' : 'none';
-  if (scrapBar) scrapBar.style.display = isWritable ? 'flex' : 'none';
+  if (navHq) navHq.classList.remove('hidden');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -701,7 +684,7 @@ async function verifyUserDiscordAccount(tokenType, accessToken) {
 
     const userRes = await fetch('https://discord.com/api/users/@me', { headers: { authorization: `${tokenType} ${accessToken}` } });
     const user = await userRes.json();
-    const discordUsername = user.username;
+    const discordUsername = user.username ? String(user.username) : "unknown_user";
 
     if (blacklistedUsers.includes(discordUsername.toLowerCase())) {
       sendDiscordWebhook(LOGS_WEBHOOK_URL, "🚨 BLACKLISTED DISCORD LOGIN ATTEMPT", `Akun ter-blacklist **${discordUsername}** mencoba login ke brangkas via Discord!`, [], 15158332);
@@ -734,7 +717,6 @@ async function verifyUserDiscordAccount(tokenType, accessToken) {
 // ============================================================================
 function handleAuthLogin(e) {
     if (e) e.preventDefault();
-
     ensureDeveloperAccountSeed();
 
     const user = document.getElementById('auth-username')?.value.trim();
@@ -745,7 +727,7 @@ function handleAuthLogin(e) {
         return;
     }
 
-    const lowerUser = user.toLowerCase();
+    const lowerUser = String(user).toLowerCase();
 
     // 1. JALUR DARURAT LANGSUNG DARI AKUN_MANUAL
     if (typeof AKUN_MANUAL !== 'undefined' && AKUN_MANUAL[lowerUser] && AKUN_MANUAL[lowerUser].pass === pass) {
@@ -797,156 +779,108 @@ function triggerBlockedModal() { document.getElementById('blocked-modal')?.class
 function closeBlockedModal() { document.getElementById('blocked-modal')?.classList.add('hidden'); }
 
 function initSession(role, name, sendLog = true) {
-  if (!isDeveloper(role) && blacklistedUsers.includes((name || '').toLowerCase())) {
+  const safeName = name ? String(name) : "GUEST";
+  const safeRole = role ? String(role) : "Soldiers";
+
+  if (!isDeveloper(safeRole) && blacklistedUsers.includes(safeName.toLowerCase())) {
     showToast("ACCOUNT FROZEN", "Akun Anda telah dibekukan (Blacklist)! Anda tidak diizinkan mengakses sistem.", "error");
     triggerBlockedModal();
     localStorage.removeItem('ton_current_session');
     return;
   }
 
-  currentLoggedInUser = name;
-  currentUserRole = role;
-  recordAuditLog('LOGIN', `Login berhasil sebagai ${role}.`);
-  localStorage.setItem('ton_current_session', JSON.stringify({ role, name }));
+  currentLoggedInUser = safeName;
+  currentUserRole = safeRole;
+  recordAuditLog('LOGIN', `Login berhasil sebagai ${safeRole}.`);
+  localStorage.setItem('ton_current_session', JSON.stringify({ role: safeRole, name: safeName }));
 
   document.getElementById('auth-gate').classList.add('hidden');
   document.getElementById('main-app').classList.remove('hidden');
-  document.getElementById('user-display-name').innerText = name.toUpperCase();
+  document.getElementById('user-display-name').innerText = safeName.toUpperCase();
   
   const roleElem = document.getElementById('user-role-text');
   if (roleElem) {
-    roleElem.innerText = role.toUpperCase();
+    roleElem.innerText = safeRole.toUpperCase();
     roleElem.className = "text-[9px] font-bold font-tech tracking-wider uppercase mt-0.5 px-1.5 py-0.5 rounded inline-block border ";
-    if (isTopAdmin(role)) roleElem.className += "bg-red-950 text-red-400 border-red-800";
-    else if (role === 'Don' || role === 'Underboss') roleElem.className += "bg-amber-950 text-amber-400 border-amber-800";
-    else if (canViewAdminPanel(role)) roleElem.className += "bg-purple-950 text-purple-400 border-purple-800";
-    else if (role === 'Soldiers') roleElem.className += "bg-blue-950 text-blue-400 border-blue-800";
+    if (isTopAdmin(safeRole)) roleElem.className += "bg-red-950 text-red-400 border-red-800";
+    else if (safeRole === 'Don' || safeRole === 'Underboss') roleElem.className += "bg-amber-950 text-amber-400 border-amber-800";
+    else if (canViewAdminPanel(safeRole)) roleElem.className += "bg-purple-950 text-purple-400 border-purple-800";
+    else if (safeRole === 'Soldiers') roleElem.className += "bg-blue-950 text-blue-400 border-blue-800";
     else roleElem.className += "bg-zinc-800 text-zinc-400 border-zinc-700";
   }
 
   updateRBACUI();
 
   if (sendLog) {
-    sendDiscordWebhook(LOGS_WEBHOOK_URL, "SYSTEM LOGIN LOG", `User **${name}** terautentikasi ke sistem.`, [{ name: "Role Access", value: role.toUpperCase(), inline: true }], isTopAdmin(role) ? 15105570 : 3066993);
-    showToast("SYSTEM READY", `Successfully logged in as ${role.toUpperCase()}.`, "success");
+    sendDiscordWebhook(LOGS_WEBHOOK_URL, "SYSTEM LOGIN LOG", `User **${safeName}** terautentikasi ke sistem.`, [{ name: "Role Access", value: safeRole.toUpperCase(), inline: true }], isTopAdmin(safeRole) ? 15105570 : 3066993);
+    showToast("SYSTEM READY", `Successfully logged in as ${safeRole.toUpperCase()}.`, "success");
   }
 
-  if (isAssociate(role)) switchTab('weapon-shop');
+  if (isAssociate(safeRole)) switchTab('weapon-shop');
   else switchTab('admin-dashboard');
   
   renderCartPageUI(); updateDashboardData(); renderProfilePage(); renderTonCatalog();
 }
 
-function logout() {
-  sendDiscordWebhook(LOGS_WEBHOOK_URL, "USER LOGOUT", `Pengguna **${currentLoggedInUser}** telah logout.`, [], 10181046);
-  localStorage.removeItem('ton_current_session');
-  document.getElementById('main-app').classList.add('hidden');
-  document.getElementById('auth-gate').classList.remove('hidden');
-  showToast("LOGOUT", "You have logged out of the session.", "error");
-}
-
 function getLucideIconForSubmenu(tabId) {
   const iconMap = {
-    'weapon-shop': 'shopping-bag',
-    'my-orders': 'shopping-cart',
-    'admin-dashboard': 'layout-dashboard',
-    'transaction-process': 'clipboard-check',
-    'vault-stock': 'box',
-    'release-outstanding': 'file-text',
-    'vault-history': 'history',
-    'stock-proof': 'camera',
-    'metal-scrap': 'cpu',
-    'the-old-norse': 'users',
-    'profile': 'user',
-    'voucher-manager': 'ticket',
-    'account-manager': 'key',
-    'blacklist-manager': 'shield-alert',
-    'backup-audit': 'database-backup',
-    'internal-board': 'message-square'
+    'weapon-shop': 'shopping-bag', 'my-orders': 'shopping-cart', 'admin-dashboard': 'layout-dashboard',
+    'transaction-process': 'clipboard-check', 'vault-stock': 'box', 'release-outstanding': 'file-text',
+    'vault-history': 'history', 'stock-proof': 'camera', 'metal-scrap': 'cpu', 'the-old-norse': 'users',
+    'profile': 'user', 'voucher-manager': 'ticket', 'account-manager': 'key', 'blacklist-manager': 'shield-alert',
+    'backup-audit': 'database-backup', 'internal-board': 'message-square'
   };
   return iconMap[tabId] || 'circle';
 }
 
 function switchTab(tabId) {
-  if (blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
-    logout();
-    showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda baru saja dibekukan oleh Moderator.", "error");
-    triggerBlockedModal();
-    return;
+  if (!isDeveloper(getUserRank()) && typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes(String(currentLoggedInUser || '').toLowerCase())) {
+    if(typeof logout === 'function') logout(); 
+    if(typeof showToast === 'function') showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda dibekukan.", "error"); 
+    if(typeof triggerBlockedModal === 'function') triggerBlockedModal(); return;
   }
-
+  
   const rank = getUserRank();
+  const safeRank = String(rank).toLowerCase().trim();
+  const canView = canViewAdminPanel(rank); 
+
   const adminOnlyTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  const safeRank = String(rank || '').toLowerCase().trim();
-
-  if (isDeveloper(safeRank)) {
-    // Developer mendapat akses penuh dan tidak dibatasi.
-  } else {
-    if (adminOnlyTabs.includes(tabId) && !canViewAdminPanel(rank) && rank !== 'Bisnis') {
-      showToast("ACCESS DENIED", "The Vault & TON Management area is CONFIDENTIAL!", "error");
-      switchTab('weapon-shop'); return;
-    }
-
-    if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager' || tabId === 'backup-audit') && rank !== 'Moderator') {
-      showToast("ACCESS DENIED", "This feature is EXCLUSIVE to the Moderator rank!", "error");
-      switchTab('weapon-shop'); return;
-    }
-
-    if (tabId === 'backup-audit' && rank === 'Moderator') {
-      showToast("ACCESS DENIED", "Moderator tidak memiliki izin untuk membuka Backup & Audit Log.", "error");
-      switchTab('weapon-shop'); return;
-    }
+  if (adminOnlyTabs.includes(tabId) && !canView) {
+    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Area Manajemen Vault BERSIFAT RAHASIA!", "error"); switchTab('weapon-shop'); return;
   }
 
-  if (tabId === 'admin-dashboard' && isAssociate(rank)) {
-    showToast("ACCESS DENIED", "Rank Associates does not have permission to access the dashboard..", "error");
-    switchTab('weapon-shop'); return;
+  if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
+    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Fitur ini EKSKLUSIF hanya untuk Moderator!", "error"); switchTab('weapon-shop'); return;
+  }
+  if (tabId === 'backup-audit' && !isDeveloper(rank)) {
+    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Backup & Audit Log hanya dapat diakses Developer!", "error"); switchTab('weapon-shop'); return;
   }
 
   const allNavButtons = document.querySelectorAll('.nav-btn');
   allNavButtons.forEach(btn => {
-    const targetTab = btn.getAttribute('data-tab');
-    const iconName = getLucideIconForSubmenu(targetTab);
+    const targetTab = btn.getAttribute('data-tab'); const iconName = typeof getLucideIconForSubmenu === 'function' ? getLucideIconForSubmenu(targetTab) : 'box';
     btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
-    
-    let iconEl = btn.querySelector('[data-lucide]');
-    if (!iconEl) {
-      btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
-    } else {
-      iconEl.setAttribute('data-lucide', iconName);
+    if (btn.style.display !== 'none') {
+        let iconEl = btn.querySelector('[data-lucide]');
+        if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
+        else iconEl.setAttribute('data-lucide', iconName);
     }
   });
 
   const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
-  if (activeBtn) {
-    activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
-  }
+  if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
 
   document.querySelectorAll('.tab-panel').forEach(panel => {
     panel.classList.add('hidden');
     panel.style.setProperty('display', 'none', 'important');
   });
   const titleMap = {
-    'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live at the checkout terminal.'],
-    'my-orders': ['Processing Order', 'Your order process and history.'],
-    'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations of The Old Norse.'],
-    'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders from residents.'],
-    'vault-stock': ['Catalog Inventory', 'Manage inventory items and selling prices, and monitor safe stock levels.'],
-    'release-outstanding': ['Release Held Balance', 'Manage transactions where stock has already been deducted, pending final settlement to the vault balance.'],
-    'vault-history': ['Cash Flow History Archive', 'A complete history of all incoming and outgoing transactions for The Old Norse.'],
-    'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot of the stock inventory to validate the database log sent to Discord.'],
-    'metal-scrap': ['Metal Scrap Inventory & Log', 'Official records of scrap metal intake and usage for crafting purposes.'],
-    'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members of The Old Norse.'],
-    'profile': ['IC Character Profile', 'Detailed information regarding resident identity, population registration number, and occupation.'],
-    'voucher-manager': ['Syndicate Voucher Manager', 'Manage, activate, and set quotas for discount promo codes for weaponry.'],
-    'account-manager': ['Account Login Credentials', 'Create and manage custom login username and password combinations for senior staff.'],
-    'blacklist-manager': ['Account Blacklist & Freeze Control', 'Manage the blacklist and freeze the accounts of residents who violate IC/OOC rules.'],
-    'backup-audit': ['Backup & Audit Log', 'Secure application data and monitor moderator activity.']
+    'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and monitor stock.'], 'release-outstanding': ['Release Held Balance', 'Manage pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of transactions.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot to validate the log.'], 'metal-scrap': ['Metal Scrap Inventory', 'Official records of scrap metal.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage promo codes.'], 'account-manager': ['Account Login Credentials', 'Manage login username and password.'], 'blacklist-manager': ['Account Blacklist Control', 'Manage the blacklist and freeze accounts.']
   };
+  titleMap['backup-audit'] = ['Backup & Audit Log', 'Secure application data and monitor moderator activity.'];
   const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
-  document.getElementById('view-title').innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
-  document.getElementById('view-subtitle').innerText = info[1];
-
+  const viewTitle = document.getElementById('view-title'); if(viewTitle) viewTitle.innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
+  const viewSub = document.getElementById('view-subtitle'); if(viewSub) viewSub.innerText = info[1];
   const target = document.getElementById('tab-' + tabId);
   if (target) {
     target.classList.remove('hidden');
@@ -954,31 +888,25 @@ function switchTab(tabId) {
   }
   
   const floatCartBtn = document.getElementById('floating-cart-btn');
-  if (floatCartBtn) {
-    if (tabId === 'weapon-shop') {
-      floatCartBtn.style.display = 'flex';
-    } else {
-      floatCartBtn.style.display = 'none';
-    }
-  }
+  if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
 
-  if (tabId === 'weapon-shop') renderMarketplace(currentMarketplaceFilter);
-  if (tabId === 'profile') renderProfilePage();
-  if (tabId === 'the-old-norse') renderTonCatalog();
-  if (tabId === 'account-manager') renderCustomAccountsTable();
-  if (tabId === 'blacklist-manager') renderBlacklistTable();
-  if (tabId === 'transaction-process') renderTxProcessTable(true);
-  if (tabId === 'vault-stock') renderVaultInventory();
-  if (tabId === 'release-outstanding') renderReleaseOutstanding();
-  if (tabId === 'vault-history') renderVaultHistory(true);
-  if (tabId === 'voucher-manager') renderVoucherManager();
-  if (tabId === 'stock-proof') {
+  if (tabId === 'weapon-shop' && typeof renderMarketplace === 'function') renderMarketplace(typeof currentMarketplaceFilter !== 'undefined' ? currentMarketplaceFilter : 'all');
+  if (tabId === 'profile' && typeof renderProfilePage === 'function') renderProfilePage();
+  if (tabId === 'the-old-norse' && typeof renderTonCatalog === 'function') renderTonCatalog();
+  if (tabId === 'account-manager' && typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
+  if (tabId === 'blacklist-manager' && typeof renderBlacklistTable === 'function') renderBlacklistTable();
+  if (tabId === 'transaction-process' && typeof renderTxProcessTable === 'function') renderTxProcessTable(true);
+  if (tabId === 'vault-stock' && typeof renderVaultInventory === 'function') renderVaultInventory();
+  if (tabId === 'release-outstanding' && typeof renderReleaseOutstanding === 'function') renderReleaseOutstanding();
+  if (tabId === 'vault-history' && typeof renderVaultHistory === 'function') renderVaultHistory(true);
+  if (tabId === 'voucher-manager' && typeof renderVoucherManager === 'function') renderVoucherManager();
+  if (tabId === 'backup-audit' && typeof renderAuditLog === 'function') renderAuditLog();
+  if (tabId === 'stock-proof' && typeof renderStockProofHistory === 'function') {
     renderStockProofHistory();
-    if (document.getElementById('proof-date-auto')) document.getElementById('proof-date-auto').value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-    if (document.getElementById('proof-member-name')) document.getElementById('proof-member-name').value = (currentLoggedInUser || 'ADMIN').toUpperCase();
+    const dateAuto = document.getElementById('proof-date-auto'); if(dateAuto) dateAuto.value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    const memberName = document.getElementById('proof-member-name'); if(memberName) memberName.value = String(currentLoggedInUser || 'ADMIN').toUpperCase();
   }
-  if (tabId === 'metal-scrap') renderMetalScrapLogs();
-  
+  if (tabId === 'metal-scrap' && typeof renderMetalScrapLogs === 'function') renderMetalScrapLogs();
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -988,7 +916,6 @@ function renderMarketplace(category = 'all') {
     if (!grid || typeof vaultInventory === 'undefined') return;
 
     let filtered = vaultInventory.filter(item => {
-      if (!item) return false;
       const itemCat = String(item.cat || 'weapon').toLowerCase();
       if (category === 'all') return true;
       if (category === 'weapon') return itemCat === 'weapon';
@@ -996,86 +923,72 @@ function renderMarketplace(category = 'all') {
       if (category === 'vest') return itemCat === 'vest';
       if (category === 'durgs') return itemCat === 'durgs' || itemCat === 'package';
       if (category === 'attachments') return itemCat === 'attachments' || itemCat.includes('attach');
-      if (category === 'tool-heist') return itemCat === 'tool-heist';
-      return true;
+      if (category === 'tool-heist') return itemCat === 'tool-heist'; return true;
     });
 
-    if (window.tonMarketSearch) {
-      filtered = filtered.filter(item => {
-        const matchName = String(item.name || '').toLowerCase().includes(window.tonMarketSearch);
-        const matchDesc = String(item.desc || '').toLowerCase().includes(window.tonMarketSearch);
-        return matchName || matchDesc;
-      });
-    }
-
+    if (window.tonMarketSearch) filtered = filtered.filter(i => String(i.name||'').toLowerCase().includes(window.tonMarketSearch) || String(i.desc||'').toLowerCase().includes(window.tonMarketSearch));
     filtered.sort((a, b) => {
-      if (window.tonMarketSort === 'name_asc') return String(a.name || '').localeCompare(String(b.name || ''));
-      if (window.tonMarketSort === 'price_desc') return Number(b.price || 0) - Number(a.price || 0);
-      if (window.tonMarketSort === 'price_asc') return Number(a.price || 0) - Number(b.price || 0);
-      return 0;
+      if (window.tonMarketSort === 'name_asc') return String(a.name||'').localeCompare(String(b.name||''));
+      if (window.tonMarketSort === 'price_desc') return Number(b.price||0) - Number(a.price||0);
+      if (window.tonMarketSort === 'price_asc') return Number(a.price||0) - Number(b.price||0); return 0;
     });
 
-    if (filtered.length === 0) {
-      grid.innerHTML = `<div class="col-span-full py-12 text-center text-zinc-500 italic"><i data-lucide="package-open" class="w-8 h-8 mx-auto mb-2 opacity-30"></i>Item not found.</div>`;
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-      return;
-    }
+    if (filtered.length === 0) { grid.innerHTML = `<div class="col-span-full py-12 text-center text-zinc-500 italic">Item not found.</div>`; return; }
 
     const htmlBuilder = filtered.map(item => {
       const originalIdx = vaultInventory.indexOf(item);
       const badge = String(item.badge || 'NORMAL').toUpperCase();
       const isComingSoon = badge === 'COMING SOON' || badge === 'COMING_SOON';
+      const isPreOrder = badge === 'PRE-ORDER'; // <-- CEK STATUS PO
       const stockNum = Number(item.stock || 0);
       const isOOS = (stockNum <= 0) && !isComingSoon;
       
       let cardBorder = 'border-[#1e2230] hover:border-red-500/50 bg-[#0e1017] shadow-sm';
       if (isComingSoon) cardBorder = 'border-emerald-500/60 bg-[#0e1017] shadow-[0_0_15px_rgba(16,185,129,0.15)]';
+      else if (isPreOrder) cardBorder = 'border-purple-500/50 hover:border-purple-400 bg-[#0e1017] shadow-[0_0_15px_rgba(168,85,247,0.10)]'; // <-- BORDER UNGU UNTUK PO
       else if (isOOS) cardBorder = 'border-red-900/60 opacity-60 bg-red-950/10';
 
-      const imgStyle = isOOS ? 'grayscale opacity-40' : (isComingSoon ? 'opacity-80 group-hover:scale-105 transition duration-300' : 'group-hover:scale-105 transition duration-300 drop-shadow-md');
+      const imgStyle = isOOS ? 'grayscale opacity-40' : 'group-hover:scale-105 transition duration-300 drop-shadow-md';
 
       let badgeText = String(item.cat || 'ITEM').toUpperCase();
       let badgeStyle = 'bg-[#131622] border-[#1e2230] text-zinc-400';
       if (isComingSoon) { badgeText = 'COMING SOON'; badgeStyle = 'bg-pink-500/10 border-pink-500/30 text-pink-500 font-bold'; }
+      else if (isPreOrder) { badgeText = 'PRE-ORDER'; badgeStyle = 'bg-purple-500/10 border-purple-500/30 text-purple-400 font-bold'; } // <-- BADGE UNGU
       else if (isOOS) { badgeText = 'OUT OF STOCK'; badgeStyle = 'bg-red-500/10 border-red-500/20 text-red-500'; }
 
       let priceHtml = `<span class="text-emerald-400 font-bold text-sm">$${Number(item.price || 0).toLocaleString()}</span>`;
       if (isComingSoon) priceHtml = `<span class="text-zinc-600 font-bold tracking-widest text-sm uppercase">LOCKED</span>`;
+      else if (isPreOrder) priceHtml = `<span class="text-purple-400 font-bold text-sm">$${Number(item.price || 0).toLocaleString()}</span>`;
 
       let actionButtonHtml = '';
-      if (isComingSoon) {
-        actionButtonHtml = `<div class="w-full pt-1"><button disabled class="w-full bg-[#131622] border border-[#1e2230] text-zinc-600 font-bold py-2 rounded-xl text-xs uppercase tracking-wider cursor-not-allowed text-center transition">UNAVAILABLE</button></div>`;
-      } else if (isOOS) {
-        actionButtonHtml = `<span class="text-[10px] font-bold text-red-500 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg">STOK KOSONG</span><button disabled class="bg-[#131622] text-zinc-600 font-bold px-3 py-1.5 rounded-xl text-xs cursor-not-allowed">KOSONG</button>`;
-      } else {
-        actionButtonHtml = `<span class="text-[10px] text-zinc-400 flex items-center gap-1.5 font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ready (${stockNum})</span><button onclick="addToCartSimple(${originalIdx})" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-4 py-1.5 rounded-xl text-xs transition shadow-md shadow-red-600/20 flex items-center gap-1.5 ml-auto"><i data-lucide="shopping-cart" class="w-3.5 h-3.5 inline"></i> Buy</button>`;
+      if (isComingSoon) { actionButtonHtml = `<div class="w-full pt-1"><button disabled class="w-full bg-[#131622] border border-[#1e2230] text-zinc-600 font-bold py-2 rounded-xl text-xs uppercase tracking-wider cursor-not-allowed">UNAVAILABLE</button></div>`; } 
+      else if (isOOS) { actionButtonHtml = `<span class="text-[10px] font-bold text-red-500 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg">STOK KOSONG</span><button disabled class="bg-[#131622] text-zinc-600 font-bold px-3 py-1.5 rounded-xl text-xs cursor-not-allowed">KOSONG</button>`; } 
+      else if (isPreOrder) {
+        actionButtonHtml = `<span class="text-[10px] text-purple-400 flex items-center gap-1.5 font-medium"><span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span> Sisa Slot (${stockNum})</span>
+        <button onclick="addToCartSimple(${originalIdx})" class="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-3 py-1.5 rounded-xl text-xs transition shadow-md shadow-purple-600/20 flex items-center gap-1.5 ml-auto"><i data-lucide="clock" class="w-3.5 h-3.5 inline"></i> Pre-Order</button>`;
+      } 
+      else {
+        actionButtonHtml = `<span class="text-[10px] text-zinc-400 flex items-center gap-1.5 font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ready (${stockNum})</span>
+        <button onclick="addToCartSimple(${originalIdx})" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-4 py-1.5 rounded-xl text-xs transition shadow-md shadow-red-600/20 flex items-center gap-1.5 ml-auto"><i data-lucide="shopping-cart" class="w-3.5 h-3.5 inline"></i> Buy</button>`;
       }
 
       return `
         <div class="product-card border rounded-2xl p-4 flex flex-col justify-between group transition duration-200 ${cardBorder}">
           <div>
             <div class="h-44 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-3 p-3 relative">
-              <img src="${item.img || ''}" alt="${item.name || ''}" class="h-full object-contain ${imgStyle}" loading="lazy">
+              <img src="${item.img || ''}" class="h-full object-contain ${imgStyle}" loading="lazy">
               <span class="absolute top-2.5 right-2.5 px-2 py-0.5 border rounded-lg text-[9px] font-bold uppercase backdrop-blur-sm ${badgeStyle}">${badgeText}</span>
             </div>
-            <div class="flex justify-between items-start mb-1">
-              <h3 class="text-base font-bold text-white ${isOOS || isComingSoon ? '' : 'group-hover:text-red-400'} transition tracking-wide">${item.name || 'Unnamed Item'}</h3>
-              ${priceHtml}
-            </div>
-            <p class="text-[11px] text-zinc-400 line-clamp-2 min-h-[32px]">${item.desc || ''}</p>
+            <div class="flex justify-between items-start mb-1"><h3 class="text-base font-bold text-white transition">${item.name}</h3>${priceHtml}</div>
+            <p class="text-[11px] text-zinc-400 line-clamp-2 min-h-[32px]">${item.desc}</p>
           </div>
-          <div class="pt-3 border-t border-[#1e2230] mt-4 flex items-center justify-between gap-2">
-            ${actionButtonHtml}
-          </div>
+          <div class="pt-3 border-t border-[#1e2230] mt-4 flex items-center justify-between gap-2">${actionButtonHtml}</div>
         </div>
       `;
     }).join('');
 
-    grid.innerHTML = htmlBuilder;
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-  } catch (e) {
-    console.error("Error renderMarketplace:", e);
-  }
+    grid.innerHTML = htmlBuilder; lucide.createIcons();
+  } catch (e) {}
 }
 
 function filterProducts(category) {
@@ -1086,7 +999,7 @@ function filterProducts(category) {
 }
 
 function handleMarketplaceSearch(query) {
-  window.tonMarketSearch = query.toLowerCase().trim();
+  window.tonMarketSearch = String(query).toLowerCase().trim();
   renderMarketplace(typeof currentMarketplaceFilter !== 'undefined' ? currentMarketplaceFilter : 'all');
 }
 
@@ -1100,7 +1013,7 @@ function addToCartSimple(index) {
     showToast("VAULT LOCKDOWN", "The vault is currently LOCKED by the Moderator! All transactions are temporarily disabled.", "error");
     return;
   }
-  if (blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
+  if (blacklistedUsers.includes(String(currentLoggedInUser || '').toLowerCase())) {
     showToast("ACCOUNT FROZEN", "Akun Anda dibekukan (Blacklist)! Anda tidak diizinkan melakukan transaksi.", "error");
     return;
   }
@@ -1261,7 +1174,7 @@ function applyPromoCode() {
   const codeElem = document.getElementById('promo-code-input');
   if (!codeElem) return;
   
-  const code = codeElem.value.trim().toUpperCase();
+  const code = String(codeElem.value).trim().toUpperCase();
   const userRank = getUserRank();
 
   if (code === '') {
@@ -1363,7 +1276,7 @@ function checkoutCart() {
     const promoStr = (typeof appliedPromoName !== 'undefined' && appliedPromoName) ? appliedPromoName : '';
 
    // Tarik data profil untuk mendapatkan Nama IC
-    const lowerUser = activeUser.toLowerCase();
+    const lowerUser = String(activeUser).toLowerCase();
     const icName = (typeof savedProfiles !== 'undefined' && savedProfiles[lowerUser]) 
                    ? savedProfiles[lowerUser].name 
                    : "Unknown Citizen";
@@ -1385,7 +1298,6 @@ function checkoutCart() {
       status: "Pending",
       items: JSON.parse(JSON.stringify(userCart)),
       
-      // 👇 DATA BARU YANG DIPERLUAS 👇
       icCharacterName: icName,               // Menyimpan Nama IC pembeli
       paymentMethod: "Cash on Delivery",     // Contoh field kustom baru
       serverTimestamp: Date.now()            // Format waktu absolut untuk sorting
@@ -1463,7 +1375,7 @@ function filterTxStatus(status) {
   renderTxProcessTable();
 }
 
-function handleTxSearch(query) { activeTxSearchQuery = query.toLowerCase().trim(); activeTxPage = 1; renderTxProcessTable(); }
+function handleTxSearch(query) { activeTxSearchQuery = String(query).toLowerCase().trim(); activeTxPage = 1; renderTxProcessTable(); }
 function handleTxSort(sortVal) { activeTxSortOrder = sortVal; activeTxPage = 1; renderTxProcessTable(); }
 function handleTxItemFilter(itemVal) { activeTxItemFilter = itemVal; activeTxPage = 1; renderTxProcessTable(); }
 function handleTxPerPage(perPageVal) { activeTxPerPage = parseInt(perPageVal) || 10; activeTxPage = 1; renderTxProcessTable(); }
@@ -1507,12 +1419,12 @@ function renderTxProcessTable(isRefresh = false) {
   let filtered = adminTransactions.filter(tx => {
     if (activeTxStatusFilter !== 'All' && tx.status !== activeTxStatusFilter) return false;
     if (activeTxSearchQuery) {
-      const matchId = tx.id.toLowerCase().includes(activeTxSearchQuery);
-      const matchBuyer = tx.buyer.toLowerCase().includes(activeTxSearchQuery);
+      const matchId = String(tx.id).toLowerCase().includes(activeTxSearchQuery);
+      const matchBuyer = String(tx.buyer).toLowerCase().includes(activeTxSearchQuery);
       if (!matchId && !matchBuyer) return false;
     }
     if (activeTxItemFilter !== 'all') {
-      const hasItem = tx.items && tx.items.some(i => i.name.toLowerCase() === activeTxItemFilter.toLowerCase());
+      const hasItem = tx.items && tx.items.some(i => String(i.name).toLowerCase() === activeTxItemFilter.toLowerCase());
       if (!hasItem && tx.package !== activeTxItemFilter) return false;
     }
     return true;
@@ -1763,7 +1675,7 @@ function releaseAllOutstanding() {
     });
     saveAppData();
     updateDashboardData();
-    sendDiscordWebhook(ORDERS_WEBHOOK_URL, "🟢 MASS SALDO RELEASED", `Sebanyak **${waitingReleaseTx.length} pesanan** telah dirilis oleh **${currentLoggedInUser.toUpperCase()}**. Total saldo **$${totalReleasedCash.toLocaleString()}** masuk ke brangkas!`, [], 3066993);
+    sendDiscordWebhook(ORDERS_WEBHOOK_URL, "🟢 MASS SALDO RELEASED", `Sebanyak **${waitingReleaseTx.length} pesanan** telah dirilis oleh **${String(currentLoggedInUser||'ADMIN').toUpperCase()}**. Total saldo **$${totalReleasedCash.toLocaleString()}** masuk ke brangkas!`, [], 3066993);
     showToast("SUCCESS", `Berhasil merilis ${waitingReleaseTx.length} pesanan sebesar $${totalReleasedCash.toLocaleString()} ke Brangkas!`, "success");
   });
 }
@@ -1811,63 +1723,47 @@ function renderVaultInventory() {
       if (typeof lucide !== 'undefined') lucide.createIcons(); return;
     }
 
-    const isWritable = ['Admin', 'Moderator', 'Don', 'Underboss', 'Bisnis'].includes(typeof getUserRank === 'function' ? getUserRank() : 'Admin');
+    const isWritable = isBisnisTier(getUserRank()); 
 
     filteredItems.forEach((item) => {
       const originalIdx = vaultInventory.indexOf(item);
       const badge = String(item.badge || 'NORMAL').toUpperCase();
       const isComingSoon = badge === 'COMING SOON' || badge === 'COMING_SOON';
+      const isPreOrder = badge === 'PRE-ORDER'; 
       
       let badgeStyle = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
       if (isComingSoon) badgeStyle = 'bg-pink-500/10 text-pink-500 border border-pink-500/30 font-bold';
+      else if (isPreOrder) badgeStyle = 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold'; 
       else if (badge === 'OUT OF STOCK') badgeStyle = 'bg-red-500/10 text-red-500 border border-red-500/20';
       else if (badge === 'LOW') badgeStyle = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
       
-      let stockButtonsHtml = '';
-      if (isWritable) {
-        stockButtonsHtml = `
-          <button onclick="changeStock(${originalIdx}, -1)" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-600 hover:text-white flex items-center justify-center transition font-bold shrink-0" title="Kurangi Stok">-</button>
-          <button onclick="changeStock(${originalIdx}, 1)" class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-600 hover:text-white flex items-center justify-center transition font-bold shrink-0" title="Tambah Stok">+</button>
-          <button onclick="openEditItemModal(${originalIdx})" class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-600 hover:text-white flex items-center justify-center transition ml-0.5 shrink-0" title="Edit Item Details"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-          <button onclick="deleteInventoryItem(${originalIdx})" class="w-7 h-7 rounded-lg bg-[#131622] hover:bg-red-600 text-zinc-400 hover:text-white flex items-center justify-center transition ml-0.5 border border-[#1e2230] shrink-0" title="Hapus Barang Permanen"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-        `;
-      }
+      let stockBtns = isWritable ? 
+        `<button onclick="changeStock(${originalIdx}, -1)" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center font-bold shrink-0">-</button>
+         <button onclick="changeStock(${originalIdx}, 1)" class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold shrink-0">+</button>
+         <button onclick="openEditItemModal(${originalIdx})" class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center ml-0.5 shrink-0"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+         <button onclick="deleteInventoryItem(${originalIdx})" class="w-7 h-7 rounded-lg bg-[#131622] text-zinc-400 hover:bg-red-600 hover:text-white flex items-center justify-center ml-0.5 border border-[#1e2230] shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` 
+         : '';
 
       grid.innerHTML += `
         <div class="bg-[#0e1017] border border-[#1e2230] rounded-2xl p-5 flex flex-col justify-between hover:border-zinc-500 transition shadow-sm">
           <div>
-            <div class="h-36 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-5 p-3 relative group">
-              <img src="${item.img || ''}" alt="${item.name || ''}" class="h-full object-contain group-hover:scale-105 transition duration-300">
-            </div>
-            <div class="flex items-center justify-between gap-2 pt-1 mb-2">
-              <h3 class="font-bold text-white text-base truncate leading-relaxed">${item.name || 'Unnamed Item'} <span class="px-2 py-0.5 bg-[#131622] border border-[#1e2230] text-zinc-400 text-[10px] rounded-md ml-1.5 align-middle">${String(item.cat || 'item').toUpperCase()}</span></h3>
-              <span class="px-2.5 py-1 text-[9px] font-bold rounded-full uppercase shrink-0 ${badgeStyle}">${badge === 'NORMAL' ? 'NORMAL' : badge}</span>
-            </div>
-            <p class="text-xs text-zinc-400 line-clamp-2 min-h-[32px] mt-2 leading-relaxed">${item.desc || ''}</p>
+            <div class="h-36 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-5 p-3 relative group"><img src="${item.img || ''}" class="h-full object-contain group-hover:scale-105 transition duration-300"></div>
+            <div class="flex items-center justify-between gap-2 pt-1 mb-2"><h3 class="font-bold text-white text-base truncate leading-relaxed">${item.name} <span class="px-2 py-0.5 bg-[#131622] border border-[#1e2230] text-zinc-400 text-[10px] rounded-md ml-1.5 align-middle">${String(item.cat).toUpperCase()}</span></h3><span class="px-2.5 py-1 text-[9px] font-bold rounded-full uppercase shrink-0 ${badgeStyle}">${badge}</span></div>
+            <p class="text-xs text-zinc-400 line-clamp-2 min-h-[32px] mt-2">${item.desc}</p>
           </div>
-          
           <div class="border-t border-[#1e2230] pt-3 mt-4 space-y-3">
             <div class="w-full bg-[#131622]/60 p-2.5 rounded-xl border border-[#1e2230]">
-              <span class="text-[10px] text-zinc-500 block uppercase tracking-wider font-semibold">Selling / Base Price</span>
-              <div class="flex items-baseline gap-1.5 flex-wrap mt-0.5">
-                <span class="text-lg font-bold font-tech text-amber-400 break-all leading-none">$${Number(item.price || 0).toLocaleString()}</span>
-                <span class="text-xs text-zinc-500 font-mono">($${Number(item.base || item.price || 0).toLocaleString()})</span>
-              </div>
+              <span class="text-[10px] text-zinc-500 block uppercase font-semibold">Selling / Base Price</span>
+              <div class="flex items-baseline gap-1.5 mt-0.5"><span class="text-lg font-bold font-tech text-amber-400">$${Number(item.price).toLocaleString()}</span><span class="text-xs text-zinc-500 font-mono">($${Number(item.base||item.price).toLocaleString()})</span></div>
             </div>
-
             <div class="flex items-center justify-between gap-2 pt-0.5">
-              <div class="flex items-center gap-1.5 bg-[#131622] px-2.5 py-1.5 rounded-xl border border-[#1e2230]">
-                <span class="text-[10px] text-zinc-400 uppercase font-semibold">Stock:</span>
-                <span class="text-sm font-bold text-white font-mono leading-none">${Number(item.stock || 0)}</span>
-              </div>
-              <div class="flex items-center gap-1 shrink-0 ml-auto">
-                ${stockButtonsHtml}
-              </div>
+              <div class="flex items-center gap-1.5 bg-[#131622] px-2.5 py-1.5 rounded-xl border border-[#1e2230]"><span class="text-[10px] text-zinc-400 uppercase font-semibold">Stock / Slot:</span><span class="text-sm font-bold text-white font-mono">${Number(item.stock)}</span></div>
+              <div class="flex items-center gap-1 shrink-0 ml-auto">${stockBtns}</div>
             </div>
           </div>
         </div>
       `;
-    });
+    }); 
     if (typeof lucide !== 'undefined') lucide.createIcons();
   } catch (err) {
     console.error("Error renderVaultInventory:", err);
@@ -1963,104 +1859,53 @@ function handleNewItemImageUpload(event) {
 
 function submitNewItem() {
   try {
-    const nameInput = document.getElementById('new-item-name');
-    const priceInput = document.getElementById('new-item-price');
-    
-    if (!nameInput || !priceInput) { 
-      if (typeof showToast === 'function') showToast("ERROR", "Form input tidak ditemukan!", "error"); 
-      return; 
-    }
-
-    const name = nameInput.value.trim();
+    const name = document.getElementById('new-item-name')?.value.trim();
     const cat = document.getElementById('new-item-cat')?.value || 'weapon';
-    const price = parseInt(priceInput.value) || 0;
+    const price = parseInt(document.getElementById('new-item-price')?.value) || 0;
     const base = parseInt(document.getElementById('new-item-base')?.value) || price;
     let stock = parseInt(document.getElementById('new-item-stock')?.value) || 0;
     const restricted = document.getElementById('new-item-restricted')?.value === 'true';
     const desc = document.getElementById('new-item-desc')?.value.trim() || 'Custom Syndicate Armory Item';
     const urlImg = document.getElementById('new-item-img-url')?.value.trim();
     const statusVal = document.getElementById('new-item-status')?.value || 'ready';
-    
     const finalImg = window.tonUploadImgBase64 || urlImg;
 
-    if (!name) { if (typeof showToast === 'function') showToast("WARNING", "Nama barang wajib diisi!", "error"); return; }
-    if (price <= 0) { if (typeof showToast === 'function') showToast("WARNING", "Harga jual harus lebih dari 0!", "error"); return; }
-    if (!finalImg) { if (typeof showToast === 'function') showToast("PHOTO MANDATORY", "Wajib upload foto atau masukkan URL gambar!", "error"); return; }
+    if (!name || price <= 0 || !finalImg) { showToast("WARNING", "Lengkapi form: Nama, Harga, dan Foto!", "error"); return; }
 
     let badgeVal = "NORMAL";
-    if (statusVal === 'coming_soon') {
-      badgeVal = "COMING SOON";
-      stock = 0;
-    } else if (stock <= 0) {
-      badgeVal = "OUT OF STOCK";
-    } else if (stock <= 5) {
-      badgeVal = "LOW";
-    }
+    if (statusVal === 'coming_soon') { badgeVal = "COMING SOON"; stock = 0; }
+    else if (stock <= 0) { badgeVal = "OUT OF STOCK"; } 
+    else if (statusVal === 'pre_order') { badgeVal = "PRE-ORDER"; } 
+    else if (stock <= 5) { badgeVal = "LOW"; }
 
-    vaultInventory.unshift({
-      name: name, cat: cat, badge: badgeVal, desc: desc,
-      price: price, base: base, stock: stock,
-      img: finalImg, restricted: restricted
-    });
-
-    if (typeof saveAppData === 'function') saveAppData(); 
-    
-    renderVaultInventory(); 
-    const activeFilter = typeof currentMarketplaceFilter !== 'undefined' ? currentMarketplaceFilter : 'all';
-    renderMarketplace(activeFilter);
-    
-    if (typeof closeAddItemModal === 'function') closeAddItemModal();
-    if (typeof showToast === 'function') showToast("ITEM ADDED", `${name} berhasil ditambahkan!`, "success");
-  } catch (err) {
-    console.error("Error submitNewItem:", err);
-    if (typeof closeAddItemModal === 'function') closeAddItemModal();
-  }
+    vaultInventory.unshift({ name, cat, badge: badgeVal, desc, price, base, stock, img: finalImg, restricted });
+    saveAppData(); renderVaultInventory(); renderMarketplace(currentMarketplaceFilter); closeAddItemModal();
+    showToast("ITEM ADDED", `${name} berhasil ditambahkan!`, "success");
+  } catch (err) { console.error(err); closeAddItemModal(); }
 }
 
 var currentEditItemIndex = null;
 var editItemUploadedBase64 = '';
 
 function openEditItemModal(index) {
-  if (!isBisnisTier(getUserRank())) { 
-    showToast("ACCESS DENIED", "Mode Read-Only tidak dapat mengedit barang!", "error"); 
-    return; 
-  }
-  const item = vaultInventory[index];
-  if (!item) {
-    showToast("ERROR", "Data barang tidak ditemukan di memori!", "error");
-    return;
-  }
-
-  const modal = document.getElementById('edit-item-modal');
-  if (!modal) { 
-    showToast("ERROR HTML", "Kode Modal Edit belum dipasang di index.html!", "error"); 
-    return; 
-  }
-
-  currentEditItemIndex = index;
-  editItemUploadedBase64 = ''; 
+  if (!isBisnisTier(getUserRank())) { showToast("ACCESS DENIED", "Mode Read-Only tidak dapat mengedit barang!", "error"); return; }
+  const item = vaultInventory[index]; if (!item) return;
+  currentEditItemIndex = index; editItemUploadedBase64 = ''; 
 
   const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-
-  setVal('edit-item-name', item.name || '');
-  setVal('edit-item-cat', item.cat || 'weapon');
-  setVal('edit-item-price', item.price || 0);
-  setVal('edit-item-base', item.base || 0);
-  setVal('edit-item-stock', item.stock || 0);
-  setVal('edit-item-restricted', String(Boolean(item.restricted)));
-  setVal('edit-item-desc', item.desc || '');
-  setVal('edit-item-img-url', '');
+  setVal('edit-item-name', item.name || ''); setVal('edit-item-cat', item.cat || 'weapon');
+  setVal('edit-item-price', item.price || 0); setVal('edit-item-base', item.base || 0);
+  setVal('edit-item-stock', item.stock || 0); setVal('edit-item-restricted', String(Boolean(item.restricted)));
+  setVal('edit-item-desc', item.desc || ''); setVal('edit-item-img-url', '');
   
-  const isComingSoon = (item.badge === 'COMING SOON' || item.badge === 'COMING_SOON');
   const statusSelect = document.getElementById('edit-item-status');
   if (statusSelect) {
-    statusSelect.value = isComingSoon ? 'coming_soon' : 'ready';
+    if (item.badge === 'COMING SOON') statusSelect.value = 'coming_soon';
+    else if (item.badge === 'PRE-ORDER') statusSelect.value = 'pre_order'; 
+    else statusSelect.value = 'ready';
   }
-
   if (document.getElementById('edit-item-file')) document.getElementById('edit-item-file').value = '';
-
-  modal.classList.remove('hidden');
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  document.getElementById('edit-item-modal').classList.remove('hidden'); lucide.createIcons();
 }
 
 function closeEditItemModal() {
@@ -2092,62 +1937,31 @@ function handleEditItemImageUpload(event) {
 }
 
 function submitEditItem() {
-  if (currentEditItemIndex === null || currentEditItemIndex === undefined) {
-    showToast("ERROR SISTEM", "Sesi edit terputus! Harap tutup modal dan klik tombol ikon pensil lagi.", "error");
-    return;
-  }
-  
-  const item = vaultInventory[currentEditItemIndex];
-  if (!item) {
-    showToast("ERROR SISTEM", "Data barang tidak ditemukan pada indeks ke-" + currentEditItemIndex, "error");
-    return;
-  }
+  if (currentEditItemIndex === null) return;
+  const item = vaultInventory[currentEditItemIndex]; if (!item) return;
 
-  const nameInput = document.getElementById('edit-item-name');
-  if (!nameInput) {
-    showToast("ERROR HTML", "Input ID 'edit-item-name' tidak ditemukan!", "error");
-    return;
-  }
-
-  const name = nameInput.value.trim();
+  const name = document.getElementById('edit-item-name')?.value.trim();
   const cat = document.getElementById('edit-item-cat')?.value || 'weapon';
   const price = parseInt(document.getElementById('edit-item-price')?.value) || 0;
   const base = parseInt(document.getElementById('edit-item-base')?.value) || price;
   let stock = parseInt(document.getElementById('edit-item-stock')?.value) || 0;
   const restricted = document.getElementById('edit-item-restricted')?.value === 'true';
-  const desc = document.getElementById('edit-item-desc')?.value.trim() || 'Custom Syndicate Armory Item';
+  const desc = document.getElementById('edit-item-desc')?.value.trim() || '';
   const urlImg = document.getElementById('edit-item-img-url')?.value.trim();
-  
-  const statusSelect = document.getElementById('edit-item-status');
-  const statusVal = statusSelect ? statusSelect.value : 'ready';
+  const statusVal = document.getElementById('edit-item-status')?.value || 'ready';
 
-  if (!name) { showToast("WARNING", "Nama barang tidak boleh kosong!", "error"); return; }
-  if (price <= 0) { showToast("WARNING", "Harga jual harus lebih dari 0!", "error"); return; }
-
-  const oldImg = item.img;
-  const finalImg = editItemUploadedBase64 || urlImg || oldImg;
+  if (!name || price <= 0) return;
+  const finalImg = editItemUploadedBase64 || urlImg || item.img;
 
   let badgeVal = "NORMAL";
-  if (statusVal === 'coming_soon') {
-    badgeVal = "COMING SOON";
-    stock = 0; 
-  } else if (stock <= 0) {
-    badgeVal = "OUT OF STOCK";
-  } else if (stock <= 5) {
-    badgeVal = "LOW";
-  }
+  if (statusVal === 'coming_soon') { badgeVal = "COMING SOON"; stock = 0; }
+  else if (stock <= 0) { badgeVal = "OUT OF STOCK"; } 
+  else if (statusVal === 'pre_order') { badgeVal = "PRE-ORDER"; } 
+  else if (stock <= 5) { badgeVal = "LOW"; }
 
-  vaultInventory[currentEditItemIndex] = {
-    name: name, cat: cat, badge: badgeVal, desc: desc,
-    price: price, base: base, stock: stock,
-    img: finalImg, restricted: restricted
-  };
-
-  saveAppData(); 
-  renderVaultInventory(); 
-  renderMarketplace(currentMarketplaceFilter);
-  closeEditItemModal();
-  showToast("ITEM UPDATED", `Barang [${name}] berhasil diperbarui menjadi ${badgeVal}!`, "success");
+  vaultInventory[currentEditItemIndex] = { name, cat, badge: badgeVal, desc, price, base, stock, img: finalImg, restricted };
+  saveAppData(); renderVaultInventory(); renderMarketplace(currentMarketplaceFilter); closeEditItemModal();
+  showToast("ITEM UPDATED", `Barang berhasil diperbarui menjadi ${badgeVal}!`, "success");
 }
 
 function renderReleaseOutstanding() {
@@ -2223,14 +2037,14 @@ function renderVaultHistory(isRefresh = false) {
   if (countElem) countElem.innerText = completedCount;
   if (rejElem) rejElem.innerText = rejectedCount;
 
-  const searchQuery = document.getElementById('hist-search-input')?.value.toLowerCase().trim() || '';
+  const searchQuery = String(document.getElementById('hist-search-input')?.value || '').toLowerCase().trim();
   const statusFilter = document.getElementById('hist-status-filter')?.value || 'ALL';
 
   const filtered = adminTransactions.filter(tx => {
     if (statusFilter !== 'ALL' && tx.status !== statusFilter) return false;
     if (searchQuery) {
-      const matchId = tx.id.toLowerCase().includes(searchQuery);
-      const matchBuyer = tx.buyer.toLowerCase().includes(searchQuery);
+      const matchId = String(tx.id).toLowerCase().includes(searchQuery);
+      const matchBuyer = String(tx.buyer).toLowerCase().includes(searchQuery);
       if (!matchId && !matchBuyer) return false;
     }
     return true;
@@ -2337,7 +2151,7 @@ function submitStockProof() {
   
   const details = detailsElem.value.trim();
   const dateStr = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-  const activeMember = (currentLoggedInUser || "ADMIN").toUpperCase();
+  const activeMember = String(currentLoggedInUser || "ADMIN").toUpperCase();
   
   const attachedImages = [...uploadedProofThumbnails];
 
@@ -2507,7 +2321,7 @@ function addScrapLog(type) {
             if (!reason) return;
             
             const timeStr = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-            const activeUser = (currentLoggedInUser || "ADMIN").toUpperCase();
+            const activeUser = String(currentLoggedInUser || "ADMIN").toUpperCase();
             
             metalScrapLogs.unshift({ type: type, qty, reason, time: timeStr, user: activeUser });
             saveAppData();
@@ -2536,32 +2350,24 @@ function switchCatalogTab(tabName) {
   renderTonCatalog();
 }
 
-// ==========================================
-// 📋 RENDER ROSTER CATALOG (BULLETPROOF FILTER)
-// ==========================================
 function renderTonCatalog() {
   const tableBody = document.getElementById('ton-catalog-table');
   if (!tableBody) return;
-  const savedProfiles = getSafeStorage('ton_all_profiles') || {};
+  const savedProfiles = (typeof getSafeStorage === 'function' ? getSafeStorage('ton_all_profiles') : window.savedProfiles) || {};
   const allUsers = Object.keys(savedProfiles);
 
   const filteredUsers = allUsers.filter(user => {
     const profile = savedProfiles[user] || {};
-    if (user.toLowerCase() === 'developer' || String(profile.job || '').toLowerCase() === 'developer') return false;
+    if (String(user).toLowerCase() === 'developer' || String(profile.job || '').toLowerCase() === 'developer') return false;
 
-    // 🛡️ PERBAIKAN MUTLAK: Tangkap apapun teksnya, hapus spasi, jadikan huruf kecil
-    const tabSaatIni = String(currentCatalogTab || 'All').toLowerCase().trim();
-    
-    // Jika teks dropdown mengandung kata "all", loloskan semua orang!
+    const tabSaatIni = String(typeof currentCatalogTab !== 'undefined' ? currentCatalogTab : 'All').toLowerCase().trim();
     if (tabSaatIni.includes('all')) return true;
-    
-    // Jika tidak, cocokkan dengan divisi masing-masing (Internal / Family)
     const grupUser = String(profile.groupType || 'Family').toLowerCase().trim();
     return grupUser === tabSaatIni;
   });
 
   const rank = getUserRank();
-  const canModifyRoster = isDonTier(rank);
+  const canModifyRoster = isDonTier(rank); // HANYA MODERATOR & DON YANG BISA EDIT ROSTER (Bisnis cuma bisa lihat)
 
   const thActions = document.getElementById('th-roster-actions');
   const noteAdmin = document.getElementById('roster-admin-note');
@@ -2570,11 +2376,12 @@ function renderTonCatalog() {
 
   if (filteredUsers.length === 0) {
     const colCount = canModifyRoster ? 4 : 3;
-    tableBody.innerHTML = `<tr><td colspan="${colCount}" class="p-4 text-center text-zinc-500 italic">There are no members registered in the category yet [${currentCatalogTab}].</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="${colCount}" class="p-4 text-center text-zinc-500 italic">There are no members registered in the category yet.</td></tr>`;
     return;
   }
   
-  const rankOptions = ["Moderator", "Don", "Underboss", "Bisnis", "Consigliere", "Captain", "Capo", "Soldiers", "Associates"];
+  // 🚨 SUSUNAN RANK BARU TERMASUK HOOD FATHER 🚨
+  const rankOptions = ["Moderator", "Don", "Underboss", "Consigliere", "Bisnis", "Hood father", "Captain", "Capo", "Soldiers", "Associates"];
   tableBody.innerHTML = '';
   
   filteredUsers.forEach((username, idx) => {
@@ -2617,7 +2424,7 @@ function adminUpdateCatalogUser(targetUsername, rankInputId, groupSelectId) {
 
     const newRank = document.getElementById(rankInputId)?.value || 'Soldiers';
     const newGroup = document.getElementById(groupSelectId)?.value || 'Family';
-    const lowerTarget = targetUsername.toLowerCase();
+    const lowerTarget = String(targetUsername).toLowerCase();
 
     if (typeof savedProfiles === 'undefined') window.savedProfiles = {};
     if (typeof customAccounts === 'undefined') window.customAccounts = {};
@@ -2707,7 +2514,7 @@ function handleProfileImageUpload(event) {
 
 function renderProfilePage() {
   const activeName = currentLoggedInUser || 'GUEST';
-  const activeRole = getUserRank().toUpperCase();
+  const activeRole = String(getUserRank()).toUpperCase();
   const nameElem = document.getElementById('profile-name');
   const badgeElem = document.getElementById('profile-rank-badge');
   if (nameElem) nameElem.innerText = activeName;
@@ -2815,7 +2622,7 @@ const profileData = {
       "NEW IN-CHARACTER (IC) PROFILE REGISTERED", 
       `Data diri IC dan Foto Profil baru saja diperbarui oleh **${activeName}**`, 
       [
-        { name: "🪪 Akun Login (Role)", value: `**${activeName}** (${getUserRank().toUpperCase()})`, inline: false },
+        { name: "🪪 Akun Login (Role)", value: `**${activeName}** (${String(getUserRank()).toUpperCase()})`, inline: false },
         { name: "👤 Nama Karakter (IC)", value: profileData.name || "-", inline: true },
         { name: "📞 Nomor Telepon", value: profileData.phone || "-", inline: true },
         { name: "🆔 ID Card / Kependudukan", value: profileData.idcard || "-", inline: true },
@@ -2865,44 +2672,6 @@ function updateDashboardData() {
   updateLockdownUI();
   renderBlacklistTable();
   renderStaffKPITable();
-}
-
-function triggerSystemReset() {
-  if (!isDeveloper(getUserRank())) {
-        showToast("ACCESS DENIED", "Hanya Developer yang memiliki akses reset seluruh riwayat sistem.", "error");
-        return;
-    }
-
-    showCustomConfirm(
-        "CONFIRMATION 1/2: SYSTEM RESET",
-        "Warning: Transaction history, cash, and logs will be permanently deleted. (DATA ROSTER & AKUN TETAP AMAN). Are you sure?",
-        () => {
-            setTimeout(() => {
-                showCustomConfirm(
-                    "FINAL CONFIRMATION 2/2: REPEAT WARNING",
-                    "This action cannot be undone! Are you absolutely 100% sure you want to delete transaction history?",
-                    () => {
-                        localStorage.removeItem('ton_admin_transactions');
-                        localStorage.removeItem('ton_org_leaderboard');
-                        localStorage.removeItem('ton_metal_scrap');
-                        
-                        adminTransactions = [];
-                        orgLeaderboard = [];
-                        metalScrapLogs = [];
-                        vaultBalance = 0;
-
-                        if (typeof saveAppData === 'function') saveAppData();
-
-                        showToast("SYSTEM RESET", "Riwayat transaksi berhasil direset! Data Roster AMAN.", "success");
-
-                        setTimeout(() => {
-                            location.reload();
-                        }, 1500);
-                    }
-                );
-            }, 300);
-        }
-    );
 }
 
 function openProofViewerModal(index) {
@@ -2973,7 +2742,7 @@ function renderCustomAccountsTable() {
   tbody.innerHTML = '';
   const users = Object.keys(customAccounts).filter(username => {
     const account = customAccounts[username] || {};
-    return username.toLowerCase() !== 'developer' && String(account.rank || '').toLowerCase() !== 'developer';
+    return String(username).toLowerCase() !== 'developer' && String(account.rank || '').toLowerCase() !== 'developer';
   });
   if (users.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-zinc-500 italic">Belum ada akun custom.</td></tr>`;
@@ -3000,36 +2769,23 @@ function addCustomAccount() {
     const user = document.getElementById('new-bisnis-user')?.value.trim() || document.getElementById('new-username')?.value.trim();
     const pass = document.getElementById('new-bisnis-pass')?.value.trim() || document.getElementById('new-password')?.value.trim();
     const rawRank = document.getElementById('new-bisnis-rank')?.value || document.getElementById('new-rank')?.value || 'Soldiers';
-    const rank = rawRank.trim();
+    const rank = String(rawRank).trim(); 
 
     if (!user || !pass) return;
-    const lowerUser = user.toLowerCase();
-    
-    if (String(rank).trim() === 'Developer' || lowerUser === 'developer') {
-        showToast("ACCESS DENIED", "Akun Developer hanya bisa dibuat oleh sistem.", "error");
-        return;
-    }
+    const lowerUser = String(user).toLowerCase();
     
     if (typeof customAccounts === 'undefined') window.customAccounts = {};
     if (typeof savedProfiles === 'undefined') window.savedProfiles = {};
 
     customAccounts[lowerUser] = { pass: pass, rank: rank };
     savedProfiles[lowerUser] = {
-        name: user.toUpperCase(),
+        name: String(user).toUpperCase(),
         phone: '0812-' + Math.floor(1000 + Math.random() * 9000),
         idcard: 'TON-' + Math.floor(1000 + Math.random() * 9000),
         job: rank,
         avatar: '',
         groupType: 'Family'
     };
-
-    // PERBAIKAN: Kirim HANYA akun ini ke Firebase menggunakan .update()
-    if (typeof db !== 'undefined' && db) {
-        const updates = {};
-        updates[`ton_global_state/customAccounts/${lowerUser}`] = customAccounts[lowerUser];
-        updates[`ton_global_state/savedProfiles/${lowerUser}`] = savedProfiles[lowerUser];
-        db.ref().update(updates).catch(e => console.log("Firebase Upload Error:", e));
-    }
 
     if (typeof saveAppData === 'function') saveAppData();
     if (typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
@@ -3043,35 +2799,20 @@ function addCustomAccount() {
 }
   
 function deleteCustomAccount(username) {
-    const currentRank = (typeof getUserRank === 'function' ? getUserRank() : currentUserRole || '').toLowerCase();
-    if (!isTopAdmin(currentRank)) {
-        if(typeof showToast === 'function') showToast("AKSES DITOLAK", "Hanya Moderator yang bisa menghapus akun.", "error");
-        return;
-    }
-
-    if (typeof showCustomConfirm === 'function') {
-        showCustomConfirm("Hapus Akun", `Yakin hapus akun "${username}"?`, () => executeDelete(username));
-    } else if (confirm(`Yakin hapus akun "${username}"?`)) {
-        executeDelete(username);
-    }
+    if (!isTopAdmin(getUserRank())) { showToast("AKSES DITOLAK", "Hanya Moderator yang bisa menghapus akun.", "error"); return; }
+    if (typeof showCustomConfirm === 'function') { showCustomConfirm("Hapus Akun", `Yakin hapus akun "${username}"?`, () => executeDelete(username));
+    } else if (confirm(`Yakin hapus akun "${username}"?`)) { executeDelete(username); }
 
     function executeDelete(targetUser) {
-        const lowerTarget = targetUser.toLowerCase();
-        
-        if (typeof customAccounts !== 'undefined' && customAccounts[lowerTarget]) {
-            delete customAccounts[lowerTarget];
-        }
-        
+        const lowerTarget = String(targetUser).toLowerCase();
+        if (typeof customAccounts !== 'undefined' && customAccounts[lowerTarget]) delete customAccounts[lowerTarget];
         if (typeof savedProfiles !== 'undefined') {
-            const realKey = Object.keys(savedProfiles).find(k => k.toLowerCase() === lowerTarget);
-            if (realKey) delete savedProfiles[realKey];
-            if (savedProfiles[targetUser]) delete savedProfiles[targetUser];
+            const realKey = Object.keys(savedProfiles).find(k => String(k).toLowerCase() === lowerTarget);
+            if (realKey) delete savedProfiles[realKey]; if (savedProfiles[targetUser]) delete savedProfiles[targetUser];
         }
-
         if (typeof saveAppData === 'function') saveAppData();
         if (typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
         if (typeof renderTonCatalog === 'function') renderTonCatalog();
-        
         if (typeof showToast === 'function') showToast("AKUN DIHAPUS", `Akun "${targetUser}" berhasil dihapus bersih!`, "success");
     }
 }
@@ -3092,7 +2833,7 @@ function toggleVaultLockdown() {
   sendDiscordWebhook(
     LOGS_WEBHOOK_URL, 
     "🚨 VAULT OPERATIONAL STATUS CHANGED", 
-    `Status operasional brangkas dan pasar persenjataan telah diubah menjadi: **${statusText}** oleh **${currentLoggedInUser.toUpperCase()}**.`, 
+    `Status operasional brangkas dan pasar persenjataan telah diubah menjadi: **${statusText}** oleh **${String(currentLoggedInUser||'').toUpperCase()}**.`, 
     [], 
     embedColor
   );
@@ -3141,7 +2882,7 @@ function renderBlacklistTable() {
     tbody.innerHTML += `
       <tr class="hover:bg-white/[0.02] transition border-b border-[#1e2230] last:border-0">
         <td class="p-3.5 font-bold text-red-400 font-mono flex items-center gap-2">
-          <i data-lucide="shield-alert" class="w-4 h-4 shrink-0"></i> ${user.toUpperCase()}
+          <i data-lucide="shield-alert" class="w-4 h-4 shrink-0"></i> ${String(user).toUpperCase()}
         </td>
         <td class="p-3.5 text-right">
           <button onclick="removeBlacklistUser('${user}')" class="px-3.5 py-1.5 bg-[#131622] hover:bg-emerald-600 text-zinc-300 hover:text-white rounded-xl text-xs font-semibold uppercase transition border border-[#1e2230]">
@@ -3155,36 +2896,24 @@ function renderBlacklistTable() {
 }
 
 function addBlacklistUser() {
-  if (getUserRank() !== 'Moderator') {
-    showToast("ACCESS DENIED", "Hanya Moderator yang berhak membekukan akun!", "error");
-    return;
-  }
+  if (!isTopAdmin(getUserRank())) { showToast("ACCESS DENIED", "Hanya Moderator yang berhak membekukan akun!", "error"); return; }
   const inputElem = document.getElementById('new-blacklist-username');
-  const targetUser = inputElem?.value.trim().toLowerCase();
-
+  const targetUser = String(inputElem?.value || '').trim().toLowerCase();
   if (!targetUser) { showToast("WARNING", "Masukkan username Discord/IC yang ingin dibekukan!", "error"); return; }
   if (blacklistedUsers.includes(targetUser)) { showToast("DUPLIKAT", `Akun "${targetUser}" sudah ada di dalam daftar Blacklist!`, "error"); return; }
-
-  blacklistedUsers.push(targetUser);
-  saveAppData();
-  if (inputElem) inputElem.value = '';
-  renderBlacklistTable();
-  
-  sendDiscordWebhook(LOGS_WEBHOOK_URL, "🛡️ USER ACCOUNT FROZEN", `Moderator **${currentLoggedInUser.toUpperCase()}** telah membekukan (blacklist) akun: **${targetUser.toUpperCase()}**.`, [], 15158332);
+  blacklistedUsers.push(targetUser); saveAppData();
+  if (inputElem) inputElem.value = ''; renderBlacklistTable();
+  sendDiscordWebhook(LOGS_WEBHOOK_URL, "🛡️ USER ACCOUNT FROZEN", `Moderator **${String(currentLoggedInUser||'').toUpperCase()}** telah membekukan (blacklist) akun: **${targetUser.toUpperCase()}**.`, [], 15158332);
   showToast("USER FROZEN", `Akun [${targetUser.toUpperCase()}] berhasil dibekukan!`, "error");
 }
 
 function removeBlacklistUser(targetUser) {
-  if (getUserRank() !== 'Moderator') {
-    showToast("ACCESS DENIED", "Hanya Moderator yang berhak memulihkan akun!", "error");
-    return;
-  }
-  showCustomConfirm("PULIHKAN AKUN", `Lepaskan status Blacklist dari akun [${targetUser.toUpperCase()}]?`, () => {
+  if (!isTopAdmin(getUserRank())) { showToast("ACCESS DENIED", "Hanya Moderator yang berhak memulihkan akun!", "error"); return; }
+  showCustomConfirm("PULIHKAN AKUN", `Lepaskan status Blacklist dari akun [${String(targetUser).toUpperCase()}]?`, () => {
     blacklistedUsers = blacklistedUsers.filter(u => u !== targetUser);
-    saveAppData();
-    renderBlacklistTable();
-    sendDiscordWebhook(LOGS_WEBHOOK_URL, "🟢 USER ACCOUNT RESTORED", `Moderator **${currentLoggedInUser.toUpperCase()}** telah memulihkan akun: **${targetUser.toUpperCase()}**.`, [], 3066993);
-    showToast("USER RESTORED", `Akun [${targetUser.toUpperCase()}] telah dipulihkan!`, "success");
+    saveAppData(); renderBlacklistTable();
+    sendDiscordWebhook(LOGS_WEBHOOK_URL, "🟢 USER ACCOUNT RESTORED", `Moderator **${String(currentLoggedInUser||'').toUpperCase()}** telah memulihkan akun: **${String(targetUser).toUpperCase()}**.`, [], 3066993);
+    showToast("USER RESTORED", `Akun [${String(targetUser).toUpperCase()}] telah dipulihkan!`, "success");
   });
 }
 
@@ -3196,7 +2925,7 @@ function renderStaffKPITable() {
   
   adminTransactions.forEach(tx => {
     if (['Approved', 'Released', 'Rejected'].includes(tx.status) && tx.processed && tx.processed !== 'Pending') {
-      const staffName = tx.processed.toUpperCase();
+      const staffName = String(tx.processed || 'ADMIN').toUpperCase();
       if (!staffStats[staffName]) {
         staffStats[staffName] = { approved: 0, rejected: 0, totalVal: 0 };
       }
@@ -3277,7 +3006,7 @@ function renderLeaderboard() {
 }
 
 function filterSidebarMenu(query) {
-  const q = query.toLowerCase().trim();
+  const q = String(query).toLowerCase().trim();
   const nav = document.querySelector('aside nav');
   if (!nav) return;
 
@@ -3328,7 +3057,7 @@ function filterSidebarMenu(query) {
 function checkAndApplyRankChanges() {
     if (!currentLoggedInUser) return; 
 
-    const lowerUser = currentLoggedInUser.toLowerCase();
+    const lowerUser = String(currentLoggedInUser).toLowerCase();
 
     // 1. CEK LIVE: APAKAH AKUN DIBEKUKAN
     if (typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes(lowerUser)) {
@@ -3339,14 +3068,13 @@ function checkAndApplyRankChanges() {
     // 2. CEK LIVE: APAKAH AKUN DIHAPUS (DELETED)?
     let perlindunganMaster = ['admin', 'moderator', 'don', 'underboss', 'bisnis', 'associates', 'xxx', 'xyroo'];
     if (typeof AKUN_MANUAL !== 'undefined') {
-        perlindunganMaster = perlindunganMaster.concat(Object.keys(AKUN_MANUAL).map(u => u.toLowerCase()));
+        perlindunganMaster = perlindunganMaster.concat(Object.keys(AKUN_MANUAL).map(u => String(u).toLowerCase()));
     }
     
     const isMaster = perlindunganMaster.includes(lowerUser);
     const inProfile = typeof savedProfiles !== 'undefined' && savedProfiles[lowerUser];
     const inCustom = typeof customAccounts !== 'undefined' && customAccounts[lowerUser];
 
-    // TAMBAHKAN PENGECEKAN AMAN: Pastikan savedProfiles benar-benar sudah ada isinya (bukan objek kosong) sebelum menendang
     if (!isMaster && !inProfile && !inCustom && Object.keys(savedProfiles).length > 2) {
         executeForceKick("ACCOUNT DELETED", "Sesi dihentikan! Akun Anda baru saja dihapus permanen oleh Administrator.");
         return;
@@ -3365,36 +3093,32 @@ function checkAndApplyRankChanges() {
         
         localStorage.setItem('ton_current_session', JSON.stringify({ role: currentUserRole, name: currentLoggedInUser }));
         const roleElem = document.getElementById('user-role-text');
-        if (roleElem) roleElem.innerText = currentUserRole.toUpperCase();
+        if (roleElem) roleElem.innerText = String(currentUserRole).toUpperCase();
 
         if (typeof updateRBACUI === 'function') updateRBACUI();
 
         if (typeof canViewAdminPanel === 'function' && !canViewAdminPanel(currentUserRole)) {
             if (typeof switchTab === 'function') switchTab('weapon-shop');
         }
-        if (typeof showToast === 'function') showToast("RANK UPDATED", `Sistem mendeteksi perubahan: Pangkat Anda dinaikkan menjadi ${currentUserRole.toUpperCase()}`, "success");
+        if (typeof showToast === 'function') showToast("RANK UPDATED", `Sistem mendeteksi perubahan: Pangkat Anda dinaikkan menjadi ${String(currentUserRole).toUpperCase()}`, "success");
     }
 }
 
 // 🥾 FUNGSI BARU: TENDANGAN KELUAR SEKETIKA (LIVE AUTO-KICK)
 function executeForceKick(title, message) {
-    // 1. Hapus memori sesi login di laptop si target
     localStorage.removeItem('ton_current_session');
     currentLoggedInUser = '';
     currentUserRole = '';
 
-    // 2. Paksa tutup semua modal atau laci yang sedang mereka buka
     document.querySelectorAll('[id$="-modal"]').forEach(m => m.classList.add('hidden'));
     const cartDrawer = document.getElementById('cart-drawer-backdrop');
     if (cartDrawer) cartDrawer.classList.add('hidden');
 
-    // 3. Sembunyikan aplikasi utama, kembalikan mereka ke gerbang login
     const mainApp = document.getElementById('main-app');
     const authGate = document.getElementById('auth-gate');
     if (mainApp) mainApp.classList.add('hidden');
     if (authGate) authGate.classList.remove('hidden');
 
-    // 4. Munculkan peringatan merah dan kunci layar mereka
     if (typeof showToast === 'function') showToast(title, message, "error");
     if (typeof triggerBlockedModal === 'function') triggerBlockedModal();
 }
@@ -3450,204 +3174,9 @@ function renderVoucherManager() {
 }
 
 function createNewVoucher() {
-  if (getUserRank() !== 'Moderator') { 
-    showToast("ACCESS DENIED", "Hanya Moderator yang berhak mengelola Voucher!", "error"); 
-    return; 
-  }
-  
-  const codeElem = document.getElementById('new-voucher-code');
-  const typeElem = document.getElementById('new-voucher-type');
-  const valElem = document.getElementById('new-voucher-val');
-  const allowedElem = document.getElementById('new-voucher-allowed');
-  const durationElem = document.getElementById('new-voucher-duration');
-  const descElem = document.getElementById('new-voucher-desc');
-
-  const code = codeElem.value.trim().toUpperCase().replace(/\s+/g, '');
-  const type = typeElem.value;
-  const val = parseInt(valElem.value);
-  const allowed = allowedElem.value;
-  const hoursDuration = parseInt(durationElem.value) || 0;
-  const desc = descElem.value.trim() || 'Syndicate Promo Code';
-
-  if (!code) { showToast("WARNING", "Kode voucher tidak boleh kosong!", "error"); return; }
-  if (isNaN(val) || val <= 0) { showToast("WARNING", "Nilai diskon harus berupa angka lebih dari 0!", "error"); return; }
-
-  const exists = syndVouchers.some(v => v.code === code);
-  if (exists) { showToast("DUPLIKAT", `Kode voucher ${code} sudah ada di tabel!`, "error"); return; }
-
-  let expiresAt = null;
-  if (hoursDuration > 0) {
-    expiresAt = Date.now() + (hoursDuration * 60 * 60 * 1000);
-  }
-
-  syndVouchers.push({ code, type, val, allowed, active: true, expiresAt, desc });
-  saveAppData();
-
-  codeElem.value = ''; valElem.value = ''; descElem.value = ''; durationElem.value = '0';
-  renderVoucherManager();
-  showToast("VOUCHER DISIMPAN", `Voucher ${code} berhasil dibuat dan langsung AKTIF!`, "success");
-}
-
-function toggleVoucherStatus(index) {
-  if (getUserRank() !== 'Moderator') {
-    showToast("ACCESS DENIED", "Hanya Moderator yang berhak mengelola Voucher!", "error");
-    return;
-  }
-  if (syndVouchers[index]) {
-    if (syndVouchers[index].expiresAt && Date.now() > syndVouchers[index].expiresAt) {
-      showToast("WARNING", "Voucher ini sudah kadaluarsa dan tidak bisa diaktifkan lagi!", "error");
-      return;
-    }
-    syndVouchers[index].active = !syndVouchers[index].active;
-    saveAppData();
-    renderVoucherManager();
-    const statText = syndVouchers[index].active ? 'ACTIVATED' : 'DEACTIVATED';
-    showToast("STATUS UPDATED", `Voucher ${syndVouchers[index].code} berhasil ${statText}.`, "success");
-  }
-}
-
-function deleteVoucher(index) {
-  if (getUserRank() !== 'Moderator') {
-    showToast("ACCESS DENIED", "Only Moderators have the authority to manage vouchers!", "error");
-    return;
-  }
-  if (syndVouchers[index]) {
-    showCustomConfirm("HAPUS VOUCHER", `Permanently delete promo code ${syndVouchers[index].code} from the system?`, () => {
-      const deletedCode = syndVouchers[index].code;
-      syndVouchers.splice(index, 1);
-      saveAppData();
-      renderVoucherManager();
-      showToast("VOUCHER DIHAPUS", `Promo code ${deletedCode} has been removed from the system.`, "error");
-    });
-  }
-}
-
-
-// ==========================================
-// 🔑 ROBOT INJEKSI: TOMBOL GANTI PASSWORD
-// ==========================================
-setInterval(() => {
-    const badgeElem = document.getElementById('profile-rank-badge');
-    const btnId = 'change-pwd-btn-force';
-    if (badgeElem && !document.getElementById(btnId)) {
-        const btnHtml = `<button id="${btnId}" onclick="promptChangePasswordModal()" class="mt-2.5 flex items-center gap-1.5 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-black transition shadow-sm uppercase font-bold"><i data-lucide="key" class="w-3.5 h-3.5"></i> GANTI PASSWORD</button>`;
-        badgeElem.insertAdjacentHTML('afterend', btnHtml);
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-    }
-}, 1000);
-
-function promptChangePasswordModal() {
-  const activeName = (currentLoggedInUser || '').toLowerCase();
-  if (!customAccounts[activeName]) {
-    showToast("AKSES DITOLAK", "Fitur ini khusus untuk akun member (Roster).", "error");
-    return;
-  }
-
-  const promptInput = document.getElementById('custom-prompt-input');
-  if (promptInput) promptInput.type = 'password';
-
-  showCustomPrompt("VERIFIKASI KEAMANAN (1/2)", "Masukkan Password LAMA Anda:", "", (oldPass) => {
-      if (!oldPass) { if (promptInput) promptInput.type = 'text'; return; }
-      if (customAccounts[activeName].pass !== oldPass) {
-        showToast("GAGAL", "Password lama yang Anda masukkan SALAH!", "error");
-        if (promptInput) promptInput.type = 'text'; 
-        return;
-      }
-
-      setTimeout(() => {
-          if (promptInput) promptInput.type = 'password'; 
-          showCustomPrompt("UBAH PASSWORD (2/2)", "Masukkan Password BARU Anda (Min. 4 karakter):", "", (newPass) => {
-              if (promptInput) promptInput.type = 'text'; 
-              if (!newPass || newPass.length < 4) {
-                showToast("GAGAL", "Ganti password dibatalkan atau terlalu pendek!", "error");
-                return;
-              }
-              customAccounts[activeName].pass = newPass;
-              saveAppData();
-              showToast("BERHASIL", "Password Anda berhasil diubah!", "success");
-            }
-          );
-      }, 300);
-  });
-}
-
-
-// ============================================================================
-// 🛡️ PENYEMPURNAAN HAK AKSES MODERATOR (SISTEM KEBAL HURUF BESAR/KECIL)
-// ============================================================================
-
-// 1. Pembersih Pembaca Pangkat (Menghapus Spasi Gaib & Huruf Kapital)
-function isTopAdmin(rank) { return ['moderator'].includes(String(rank).toLowerCase().trim()); }
-function isTopAdmin(rank) { return isDeveloper(rank) || ['moderator'].includes(String(rank).toLowerCase().trim()); }
-function isDonTier(rank) { return ['moderator', 'don', 'underboss'].includes(String(rank).toLowerCase().trim()); }
-function isBisnisTier(rank) { return ['moderator', 'don', 'underboss', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'underboss', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
-function isReadOnlyAdminTier(rank) { return ['capo', 'captain', 'consigliere'].includes(String(rank).toLowerCase().trim()); }
-function canViewAdminPanel(rank) { return isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
-function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
-
-// 2. Perbaiki fungsi pembuat akun (Otomatis membersihkan teks saat pembuatan)
-function addCustomAccount() {
-    const user = document.getElementById('new-bisnis-user')?.value.trim() || document.getElementById('new-username')?.value.trim();
-    const pass = document.getElementById('new-bisnis-pass')?.value.trim() || document.getElementById('new-password')?.value.trim();
-    const rawRank = document.getElementById('new-bisnis-rank')?.value || document.getElementById('new-rank')?.value || 'Soldiers';
-    const rank = rawRank.trim(); // <-- Kunci perbaikan
-
-    if (!user || !pass) return;
-    const lowerUser = user.toLowerCase();
-    
-    if (typeof customAccounts === 'undefined') window.customAccounts = {};
-    if (typeof savedProfiles === 'undefined') window.savedProfiles = {};
-
-    customAccounts[lowerUser] = { pass: pass, rank: rank };
-    savedProfiles[lowerUser] = {
-        name: user.toUpperCase(),
-        phone: '0812-' + Math.floor(1000 + Math.random() * 9000),
-        idcard: 'TON-' + Math.floor(1000 + Math.random() * 9000),
-        job: rank,
-        avatar: '',
-        groupType: 'Family'
-    };
-
-    if (typeof saveAppData === 'function') saveAppData();
-    if (typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
-    if (typeof renderTonCatalog === 'function') renderTonCatalog();
-    if (typeof showToast === 'function') showToast("AKUN BERHASIL DIBUAT", `Akun ${user} siap dipakai!`, "success");
-
-    if (document.getElementById('new-bisnis-user')) document.getElementById('new-bisnis-user').value = '';
-    if (document.getElementById('new-bisnis-pass')) document.getElementById('new-bisnis-pass').value = '';
-    if (document.getElementById('new-username')) document.getElementById('new-username').value = '';
-    if (document.getElementById('new-password')) document.getElementById('new-password').value = '';
-}
-
-// 3. Menimpa fungsi Aksi Moderator agar fleksibel
-function addBlacklistUser() {
-  if (!isTopAdmin(getUserRank())) { showToast("ACCESS DENIED", "Hanya Moderator yang berhak membekukan akun!", "error"); return; }
-  const inputElem = document.getElementById('new-blacklist-username');
-  const targetUser = inputElem?.value.trim().toLowerCase();
-  if (!targetUser) { showToast("WARNING", "Masukkan username Discord/IC yang ingin dibekukan!", "error"); return; }
-  if (blacklistedUsers.includes(targetUser)) { showToast("DUPLIKAT", `Akun "${targetUser}" sudah ada di dalam daftar Blacklist!`, "error"); return; }
-  blacklistedUsers.push(targetUser); saveAppData();
-  if (inputElem) inputElem.value = ''; renderBlacklistTable();
-  sendDiscordWebhook(LOGS_WEBHOOK_URL, "🛡️ USER ACCOUNT FROZEN", `Moderator **${currentLoggedInUser.toUpperCase()}** telah membekukan (blacklist) akun: **${targetUser.toUpperCase()}**.`, [], 15158332);
-  showToast("USER FROZEN", `Akun [${targetUser.toUpperCase()}] berhasil dibekukan!`, "error");
-}
-
-function removeBlacklistUser(targetUser) {
-  if (!isTopAdmin(getUserRank())) { showToast("ACCESS DENIED", "Hanya Moderator yang berhak memulihkan akun!", "error"); return; }
-  showCustomConfirm("PULIHKAN AKUN", `Lepaskan status Blacklist dari akun [${targetUser.toUpperCase()}]?`, () => {
-    blacklistedUsers = blacklistedUsers.filter(u => u !== targetUser);
-    saveAppData(); renderBlacklistTable();
-    sendDiscordWebhook(LOGS_WEBHOOK_URL, "🟢 USER ACCOUNT RESTORED", `Moderator **${currentLoggedInUser.toUpperCase()}** telah memulihkan akun: **${targetUser.toUpperCase()}**.`, [], 3066993);
-    showToast("USER RESTORED", `Akun [${targetUser.toUpperCase()}] telah dipulihkan!`, "success");
-  });
-}
-
-function createNewVoucher() {
   if (!isTopAdmin(getUserRank())) { showToast("ACCESS DENIED", "Hanya Moderator yang berhak mengelola Voucher!", "error"); return; }
   const codeElem = document.getElementById('new-voucher-code'); const typeElem = document.getElementById('new-voucher-type'); const valElem = document.getElementById('new-voucher-val'); const allowedElem = document.getElementById('new-voucher-allowed'); const durationElem = document.getElementById('new-voucher-duration'); const descElem = document.getElementById('new-voucher-desc');
-  const code = codeElem.value.trim().toUpperCase().replace(/\s+/g, ''); const type = typeElem.value; const val = parseInt(valElem.value); const allowed = allowedElem.value; const hoursDuration = parseInt(durationElem.value) || 0; const desc = descElem.value.trim() || 'Syndicate Promo Code';
+  const code = String(codeElem.value).trim().toUpperCase().replace(/\s+/g, ''); const type = typeElem.value; const val = parseInt(valElem.value); const allowed = allowedElem.value; const hoursDuration = parseInt(durationElem.value) || 0; const desc = descElem.value.trim() || 'Syndicate Promo Code';
   if (!code) { showToast("WARNING", "Kode voucher tidak boleh kosong!", "error"); return; } if (isNaN(val) || val <= 0) { showToast("WARNING", "Nilai diskon harus berupa angka lebih dari 0!", "error"); return; }
   if (syndVouchers.some(v => v.code === code)) { showToast("DUPLIKAT", `Kode voucher ${code} sudah ada di tabel!`, "error"); return; }
   let expiresAt = hoursDuration > 0 ? Date.now() + (hoursDuration * 60 * 60 * 1000) : null;
@@ -3688,575 +3217,84 @@ function triggerSystemReset() {
   });
 }
 
-function deleteCustomAccount(username) {
-    if (!isTopAdmin(getUserRank())) { showToast("AKSES DITOLAK", "Hanya Moderator yang bisa menghapus akun.", "error"); return; }
-    if (typeof showCustomConfirm === 'function') { showCustomConfirm("Hapus Akun", `Yakin hapus akun "${username}"?`, () => executeDelete(username));
-    } else if (confirm(`Yakin hapus akun "${username}"?`)) { executeDelete(username); }
 
-    function executeDelete(targetUser) {
-        const lowerTarget = targetUser.toLowerCase();
-        if (typeof customAccounts !== 'undefined' && customAccounts[lowerTarget]) delete customAccounts[lowerTarget];
-        if (typeof savedProfiles !== 'undefined') {
-            const realKey = Object.keys(savedProfiles).find(k => k.toLowerCase() === lowerTarget);
-            if (realKey) delete savedProfiles[realKey]; if (savedProfiles[targetUser]) delete savedProfiles[targetUser];
-        }
-        if (typeof saveAppData === 'function') saveAppData();
-        if (typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
-        if (typeof renderTonCatalog === 'function') renderTonCatalog();
-        if (typeof showToast === 'function') showToast("AKUN DIHAPUS", `Akun "${targetUser}" berhasil dihapus bersih!`, "success");
-    }
-}
-
-// Menimpa pembuka gembok halaman
-function switchTab(tabId) {
-  if (blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
-    logout(); showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda baru saja dibekukan oleh Moderator.", "error"); triggerBlockedModal(); return;
-  }
-  const rank = getUserRank();
-  const adminOnlyTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  
-  if (adminOnlyTabs.includes(tabId) && !canViewAdminPanel(rank) && !isBisnisTier(rank)) {
-    showToast("ACCESS DENIED", "The Vault & TON Management area is CONFIDENTIAL!", "error"); switchTab('weapon-shop'); return;
-  }
-  if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
-    showToast("ACCESS DENIED", "This feature is EXCLUSIVE to the Moderator rank!", "error"); switchTab('weapon-shop'); return;
-  }
-  if (tabId === 'backup-audit' && !isDeveloper(rank)) {
-    showToast("ACCESS DENIED", "Backup & Audit Log hanya dapat diakses Developer!", "error"); switchTab('weapon-shop'); return;
-  }
-  if (tabId === 'admin-dashboard' && isAssociate(rank)) {
-    showToast("ACCESS DENIED", "Rank Associates does not have permission to access the dashboard..", "error"); switchTab('weapon-shop'); return;
-  }
-
-  const allNavButtons = document.querySelectorAll('.nav-btn');
-  allNavButtons.forEach(btn => {
-    const targetTab = btn.getAttribute('data-tab'); const iconName = getLucideIconForSubmenu(targetTab);
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
-    let iconEl = btn.querySelector('[data-lucide]');
-    if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
-    else iconEl.setAttribute('data-lucide', iconName);
-  });
-
-  const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
-  if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none" + (activeBtn.dataset.developerOnly === 'true' ? ' developer-only developer-access' : '');
-
-  document.querySelectorAll('.tab-panel').forEach(panel => {
-    panel.classList.add('hidden');
-    panel.style.setProperty('display', 'none', 'important');
-  });
-  const titleMap = {
-    'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live at the checkout terminal.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations of The Old Norse.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders from residents.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and selling prices, and monitor safe stock levels.'], 'release-outstanding': ['Release Held Balance', 'Manage transactions where stock has already been deducted, pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of all incoming and outgoing transactions for The Old Norse.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot of the stock inventory to validate the database log sent to Discord.'], 'metal-scrap': ['Metal Scrap Inventory & Log', 'Official records of scrap metal intake and usage for crafting purposes.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members of The Old Norse.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity, population registration number, and occupation.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage, activate, and set quotas for discount promo codes for weaponry.'], 'account-manager': ['Account Login Credentials', 'Create and manage custom login username and password combinations for senior staff.'], 'blacklist-manager': ['Account Blacklist & Freeze Control', 'Manage the blacklist and freeze the accounts of residents who violate IC/OOC rules.']
-  };
-  titleMap['backup-audit'] = ['Backup & Audit Log', 'Secure application data and monitor moderator activity.'];
-  titleMap['internal-board'] = ['Internal Message Board', 'Komunikasi internal untuk pengumuman dan koordinasi anggota.'];
-  const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
-  document.getElementById('view-title').innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
-  document.getElementById('view-subtitle').innerText = info[1];
-  const target = document.getElementById('tab-' + tabId);
-  if (target) {
-    target.classList.remove('hidden');
-    target.style.setProperty('display', 'block', 'important');
-  }
-  
-  const floatCartBtn = document.getElementById('floating-cart-btn');
-  if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
-
-  if (tabId === 'weapon-shop') renderMarketplace(currentMarketplaceFilter);
-  if (tabId === 'profile') renderProfilePage();
-  if (tabId === 'the-old-norse') renderTonCatalog();
-  if (tabId === 'account-manager') renderCustomAccountsTable();
-  if (tabId === 'blacklist-manager') renderBlacklistTable();
-  if (tabId === 'transaction-process') renderTxProcessTable(true);
-  if (tabId === 'vault-stock') renderVaultInventory();
-  if (tabId === 'release-outstanding') renderReleaseOutstanding();
-  if (tabId === 'vault-history') renderVaultHistory(true);
-  if (tabId === 'voucher-manager') renderVoucherManager();
-  if (tabId === 'stock-proof') {
-    renderStockProofHistory();
-    if (document.getElementById('proof-date-auto')) document.getElementById('proof-date-auto').value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-    if (document.getElementById('proof-member-name')) document.getElementById('proof-member-name').value = (currentLoggedInUser || 'ADMIN').toUpperCase();
-  }
-  if (tabId === 'metal-scrap') renderMetalScrapLogs();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-
-// ============================================================================
-// 📦 PENYEMPURNAAN FITUR PRE-ORDER (PO) SYSTEM
-// ============================================================================
-
-// 1. ROBOT INJEKSI HTML: Menambahkan opsi "Pre-Order" ke dalam dropdown secara otomatis
+// ==========================================
+// 🔑 ROBOT INJEKSI: TOMBOL GANTI PASSWORD
+// ==========================================
 setInterval(() => {
-    ['new-item-status', 'edit-item-status'].forEach(id => {
-        const selectElem = document.getElementById(id);
-        if (selectElem && !selectElem.querySelector('option[value="pre_order"]')) {
-            selectElem.insertAdjacentHTML('beforeend', '<option value="pre_order" class="text-purple-400 font-bold">Pre-Order (PO)</option>');
+    const badgeElem = document.getElementById('profile-rank-badge');
+    const btnId = 'change-pwd-btn-force';
+    if (badgeElem && !document.getElementById(btnId)) {
+        const btnHtml = `<button id="${btnId}" onclick="promptChangePasswordModal()" class="mt-2.5 flex items-center gap-1.5 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-black transition shadow-sm uppercase font-bold"><i data-lucide="key" class="w-3.5 h-3.5"></i> GANTI PASSWORD</button>`;
+        badgeElem.insertAdjacentHTML('afterend', btnHtml);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+}, 1000);
+
+function promptChangePasswordModal() {
+  const activeName = String(currentLoggedInUser || '').toLowerCase();
+  if (!customAccounts[activeName]) {
+    showToast("AKSES DITOLAK", "Fitur ini khusus untuk akun member (Roster).", "error");
+    return;
+  }
+
+  const promptInput = document.getElementById('custom-prompt-input');
+  if (promptInput) promptInput.type = 'password';
+
+  showCustomPrompt("VERIFIKASI KEAMANAN (1/2)", "Masukkan Password LAMA Anda:", "", (oldPass) => {
+      if (!oldPass) { if (promptInput) promptInput.type = 'text'; return; }
+      if (customAccounts[activeName].pass !== oldPass) {
+        showToast("GAGAL", "Password lama yang Anda masukkan SALAH!", "error");
+        if (promptInput) promptInput.type = 'text'; 
+        return;
+      }
+
+      setTimeout(() => {
+          if (promptInput) promptInput.type = 'password'; 
+          showCustomPrompt("UBAH PASSWORD (2/2)", "Masukkan Password BARU Anda (Min. 4 karakter):", "", (newPass) => {
+              if (promptInput) promptInput.type = 'text'; 
+              if (!newPass || newPass.length < 4) {
+                showToast("GAGAL", "Ganti password dibatalkan atau terlalu pendek!", "error");
+                return;
+              }
+              customAccounts[activeName].pass = newPass;
+              saveAppData();
+              showToast("BERHASIL", "Password Anda berhasil diubah!", "success");
+            }
+          );
+      }, 300);
+  });
+}
+
+// ============================================================================
+// 💉 INJEKSI RANK CAPO: MENGEMBALIKAN CAPO KE MENU DROPDOWN
+// ============================================================================
+setInterval(() => {
+    document.querySelectorAll('select').forEach(select => {
+        const optCaptain = select.querySelector('option[value="Captain"]') || select.querySelector('option[value="captain"]');
+        const optCapo = select.querySelector('option[value="Capo"]') || select.querySelector('option[value="capo"]');
+        if (optCaptain && !optCapo) {
+            optCaptain.insertAdjacentHTML('afterend', '<option value="Capo">Capo</option>');
         }
     });
 }, 1000);
 
-// 2. TIMPA FUNGSI SIMPAN BARANG BARU
-function submitNewItem() {
-  try {
-    const name = document.getElementById('new-item-name')?.value.trim();
-    const cat = document.getElementById('new-item-cat')?.value || 'weapon';
-    const price = parseInt(document.getElementById('new-item-price')?.value) || 0;
-    const base = parseInt(document.getElementById('new-item-base')?.value) || price;
-    let stock = parseInt(document.getElementById('new-item-stock')?.value) || 0;
-    const restricted = document.getElementById('new-item-restricted')?.value === 'true';
-    const desc = document.getElementById('new-item-desc')?.value.trim() || 'Custom Syndicate Armory Item';
-    const urlImg = document.getElementById('new-item-img-url')?.value.trim();
-    const statusVal = document.getElementById('new-item-status')?.value || 'ready';
-    const finalImg = window.tonUploadImgBase64 || urlImg;
-
-    if (!name || price <= 0 || !finalImg) { showToast("WARNING", "Lengkapi form: Nama, Harga, dan Foto!", "error"); return; }
-
-    let badgeVal = "NORMAL";
-    if (statusVal === 'coming_soon') { badgeVal = "COMING SOON"; stock = 0; }
-    else if (stock <= 0) { badgeVal = "OUT OF STOCK"; } 
-    else if (statusVal === 'pre_order') { badgeVal = "PRE-ORDER"; } // <-- DETEKSI PO
-    else if (stock <= 5) { badgeVal = "LOW"; }
-
-    vaultInventory.unshift({ name, cat, badge: badgeVal, desc, price, base, stock, img: finalImg, restricted });
-    saveAppData(); renderVaultInventory(); renderMarketplace(currentMarketplaceFilter); closeAddItemModal();
-    showToast("ITEM ADDED", `${name} berhasil ditambahkan!`, "success");
-  } catch (err) { console.error(err); closeAddItemModal(); }
-}
-
-// 3. TIMPA FUNGSI EDIT BARANG
-function openEditItemModal(index) {
-  if (!isBisnisTier(getUserRank())) { showToast("ACCESS DENIED", "Mode Read-Only tidak dapat mengedit barang!", "error"); return; }
-  const item = vaultInventory[index]; if (!item) return;
-  currentEditItemIndex = index; editItemUploadedBase64 = ''; 
-
-  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-  setVal('edit-item-name', item.name || ''); setVal('edit-item-cat', item.cat || 'weapon');
-  setVal('edit-item-price', item.price || 0); setVal('edit-item-base', item.base || 0);
-  setVal('edit-item-stock', item.stock || 0); setVal('edit-item-restricted', String(Boolean(item.restricted)));
-  setVal('edit-item-desc', item.desc || ''); setVal('edit-item-img-url', '');
-  
-  const statusSelect = document.getElementById('edit-item-status');
-  if (statusSelect) {
-    if (item.badge === 'COMING SOON') statusSelect.value = 'coming_soon';
-    else if (item.badge === 'PRE-ORDER') statusSelect.value = 'pre_order'; // <-- MENAMPILKAN PO DI MODAL
-    else statusSelect.value = 'ready';
-  }
-  if (document.getElementById('edit-item-file')) document.getElementById('edit-item-file').value = '';
-  document.getElementById('edit-item-modal').classList.remove('hidden'); lucide.createIcons();
-}
-
-function submitEditItem() {
-  if (currentEditItemIndex === null) return;
-  const item = vaultInventory[currentEditItemIndex]; if (!item) return;
-
-  const name = document.getElementById('edit-item-name')?.value.trim();
-  const cat = document.getElementById('edit-item-cat')?.value || 'weapon';
-  const price = parseInt(document.getElementById('edit-item-price')?.value) || 0;
-  const base = parseInt(document.getElementById('edit-item-base')?.value) || price;
-  let stock = parseInt(document.getElementById('edit-item-stock')?.value) || 0;
-  const restricted = document.getElementById('edit-item-restricted')?.value === 'true';
-  const desc = document.getElementById('edit-item-desc')?.value.trim() || '';
-  const urlImg = document.getElementById('edit-item-img-url')?.value.trim();
-  const statusVal = document.getElementById('edit-item-status')?.value || 'ready';
-
-  if (!name || price <= 0) return;
-  const finalImg = editItemUploadedBase64 || urlImg || item.img;
-
-  let badgeVal = "NORMAL";
-  if (statusVal === 'coming_soon') { badgeVal = "COMING SOON"; stock = 0; }
-  else if (stock <= 0) { badgeVal = "OUT OF STOCK"; } 
-  else if (statusVal === 'pre_order') { badgeVal = "PRE-ORDER"; } // <-- DETEKSI PO
-  else if (stock <= 5) { badgeVal = "LOW"; }
-
-  vaultInventory[currentEditItemIndex] = { name, cat, badge: badgeVal, desc, price, base, stock, img: finalImg, restricted };
-  saveAppData(); renderVaultInventory(); renderMarketplace(currentMarketplaceFilter); closeEditItemModal();
-  showToast("ITEM UPDATED", `Barang berhasil diperbarui menjadi ${badgeVal}!`, "success");
-}
-
-// 4. TIMPA UI MARKETPLACE AGAR PO JADI WARNA UNGU
-function renderMarketplace(category = 'all') {
-  try {
-    const grid = document.getElementById('product-grid');
-    if (!grid || typeof vaultInventory === 'undefined') return;
-
-    let filtered = vaultInventory.filter(item => {
-      const itemCat = String(item.cat || 'weapon').toLowerCase();
-      if (category === 'all') return true;
-      if (category === 'weapon') return itemCat === 'weapon';
-      if (category === 'ammo') return itemCat === 'ammo';
-      if (category === 'vest') return itemCat === 'vest';
-      if (category === 'durgs') return itemCat === 'durgs' || itemCat === 'package';
-      if (category === 'attachments') return itemCat === 'attachments' || itemCat.includes('attach');
-      if (category === 'tool-heist') return itemCat === 'tool-heist'; return true;
-    });
-
-    if (window.tonMarketSearch) filtered = filtered.filter(i => (i.name||'').toLowerCase().includes(window.tonMarketSearch) || (i.desc||'').toLowerCase().includes(window.tonMarketSearch));
-    filtered.sort((a, b) => {
-      if (window.tonMarketSort === 'name_asc') return String(a.name||'').localeCompare(String(b.name||''));
-      if (window.tonMarketSort === 'price_desc') return Number(b.price||0) - Number(a.price||0);
-      if (window.tonMarketSort === 'price_asc') return Number(a.price||0) - Number(b.price||0); return 0;
-    });
-
-    if (filtered.length === 0) { grid.innerHTML = `<div class="col-span-full py-12 text-center text-zinc-500 italic">Item not found.</div>`; return; }
-
-    const htmlBuilder = filtered.map(item => {
-      const originalIdx = vaultInventory.indexOf(item);
-      const badge = String(item.badge || 'NORMAL').toUpperCase();
-      const isComingSoon = badge === 'COMING SOON' || badge === 'COMING_SOON';
-      const isPreOrder = badge === 'PRE-ORDER'; // <-- CEK STATUS PO
-      const stockNum = Number(item.stock || 0);
-      const isOOS = (stockNum <= 0) && !isComingSoon;
-      
-      let cardBorder = 'border-[#1e2230] hover:border-red-500/50 bg-[#0e1017] shadow-sm';
-      if (isComingSoon) cardBorder = 'border-emerald-500/60 bg-[#0e1017] shadow-[0_0_15px_rgba(16,185,129,0.15)]';
-      else if (isPreOrder) cardBorder = 'border-purple-500/50 hover:border-purple-400 bg-[#0e1017] shadow-[0_0_15px_rgba(168,85,247,0.10)]'; // <-- BORDER UNGU UNTUK PO
-      else if (isOOS) cardBorder = 'border-red-900/60 opacity-60 bg-red-950/10';
-
-      const imgStyle = isOOS ? 'grayscale opacity-40' : 'group-hover:scale-105 transition duration-300 drop-shadow-md';
-
-      let badgeText = String(item.cat || 'ITEM').toUpperCase();
-      let badgeStyle = 'bg-[#131622] border-[#1e2230] text-zinc-400';
-      if (isComingSoon) { badgeText = 'COMING SOON'; badgeStyle = 'bg-pink-500/10 border-pink-500/30 text-pink-500 font-bold'; }
-      else if (isPreOrder) { badgeText = 'PRE-ORDER'; badgeStyle = 'bg-purple-500/10 border-purple-500/30 text-purple-400 font-bold'; } // <-- BADGE UNGU
-      else if (isOOS) { badgeText = 'OUT OF STOCK'; badgeStyle = 'bg-red-500/10 border-red-500/20 text-red-500'; }
-
-      let priceHtml = `<span class="text-emerald-400 font-bold text-sm">$${Number(item.price || 0).toLocaleString()}</span>`;
-      if (isComingSoon) priceHtml = `<span class="text-zinc-600 font-bold tracking-widest text-sm uppercase">LOCKED</span>`;
-      else if (isPreOrder) priceHtml = `<span class="text-purple-400 font-bold text-sm">$${Number(item.price || 0).toLocaleString()}</span>`;
-
-      let actionButtonHtml = '';
-      if (isComingSoon) { actionButtonHtml = `<div class="w-full pt-1"><button disabled class="w-full bg-[#131622] border border-[#1e2230] text-zinc-600 font-bold py-2 rounded-xl text-xs uppercase tracking-wider cursor-not-allowed">UNAVAILABLE</button></div>`; } 
-      else if (isOOS) { actionButtonHtml = `<span class="text-[10px] font-bold text-red-500 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-lg">STOK KOSONG</span><button disabled class="bg-[#131622] text-zinc-600 font-bold px-3 py-1.5 rounded-xl text-xs cursor-not-allowed">KOSONG</button>`; } 
-      else if (isPreOrder) {
-        // TOMBOL PO UNGU KHUSUS
-        actionButtonHtml = `<span class="text-[10px] text-purple-400 flex items-center gap-1.5 font-medium"><span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span> Sisa Slot (${stockNum})</span>
-        <button onclick="addToCartSimple(${originalIdx})" class="bg-purple-600 hover:bg-purple-500 text-white font-semibold px-3 py-1.5 rounded-xl text-xs transition shadow-md shadow-purple-600/20 flex items-center gap-1.5 ml-auto"><i data-lucide="clock" class="w-3.5 h-3.5 inline"></i> Pre-Order</button>`;
-      } 
-      else {
-        actionButtonHtml = `<span class="text-[10px] text-zinc-400 flex items-center gap-1.5 font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ready (${stockNum})</span>
-        <button onclick="addToCartSimple(${originalIdx})" class="bg-red-600 hover:bg-red-500 text-white font-semibold px-4 py-1.5 rounded-xl text-xs transition shadow-md shadow-red-600/20 flex items-center gap-1.5 ml-auto"><i data-lucide="shopping-cart" class="w-3.5 h-3.5 inline"></i> Buy</button>`;
-      }
-
-      return `
-        <div class="product-card border rounded-2xl p-4 flex flex-col justify-between group transition duration-200 ${cardBorder}">
-          <div>
-            <div class="h-44 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-3 p-3 relative">
-              <img src="${item.img || ''}" class="h-full object-contain ${imgStyle}" loading="lazy">
-              <span class="absolute top-2.5 right-2.5 px-2 py-0.5 border rounded-lg text-[9px] font-bold uppercase backdrop-blur-sm ${badgeStyle}">${badgeText}</span>
-            </div>
-            <div class="flex justify-between items-start mb-1"><h3 class="text-base font-bold text-white transition">${item.name}</h3>${priceHtml}</div>
-            <p class="text-[11px] text-zinc-400 line-clamp-2 min-h-[32px]">${item.desc}</p>
-          </div>
-          <div class="pt-3 border-t border-[#1e2230] mt-4 flex items-center justify-between gap-2">${actionButtonHtml}</div>
-        </div>
-      `;
-    }).join('');
-
-    grid.innerHTML = htmlBuilder; lucide.createIcons();
-  } catch (e) {}
-}
-
-// 5. TIMPA UI INVENTORY AGAR ADA LABEL UNGU
-function renderVaultInventory() {
-  try {
-    const grid = document.getElementById('vault-inventory-grid') || document.getElementById('inventory-grid');
-    if (!grid) return;
-    const activeFilter = typeof activeInventoryFilter !== 'undefined' ? activeInventoryFilter : 'all';
-    
-    const filteredItems = vaultInventory.filter(item => {
-      const itemCat = String(item.cat || 'weapon').toLowerCase();
-      if (activeFilter === 'all') return true;
-      return (itemCat === activeFilter || (activeFilter === 'durgs' && itemCat === 'package') || (activeFilter === 'attachments' && itemCat.includes('attach')));
-    });
-    
-    if (document.getElementById('total-inventory-count')) document.getElementById('total-inventory-count').innerText = filteredItems.length;
-    grid.innerHTML = '';
-    if (filteredItems.length === 0) return;
-
-    const isWritable = ['Admin', 'Moderator', 'Don', 'Underboss', 'Bisnis'].includes(getUserRank());
-
-    filteredItems.forEach((item) => {
-      const originalIdx = vaultInventory.indexOf(item);
-      const badge = String(item.badge || 'NORMAL').toUpperCase();
-      
-      let badgeStyle = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
-      if (badge === 'COMING SOON') badgeStyle = 'bg-pink-500/10 text-pink-500 border border-pink-500/30 font-bold';
-      else if (badge === 'PRE-ORDER') badgeStyle = 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold'; // <-- BADGE UNGU DI INVENTORY
-      else if (badge === 'OUT OF STOCK') badgeStyle = 'bg-red-500/10 text-red-500 border border-red-500/20';
-      else if (badge === 'LOW') badgeStyle = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
-      
-      let stockBtns = isWritable ? `<button onclick="changeStock(${originalIdx}, -1)" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center font-bold shrink-0">-</button><button onclick="changeStock(${originalIdx}, 1)" class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold shrink-0">+</button><button onclick="openEditItemModal(${originalIdx})" class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center ml-0.5 shrink-0"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button><button onclick="deleteInventoryItem(${originalIdx})" class="w-7 h-7 rounded-lg bg-[#131622] text-zinc-400 hover:bg-red-600 hover:text-white flex items-center justify-center ml-0.5 border border-[#1e2230] shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : '';
-
-      grid.innerHTML += `
-        <div class="bg-[#0e1017] border border-[#1e2230] rounded-2xl p-5 flex flex-col justify-between hover:border-zinc-500 transition shadow-sm">
-          <div>
-            <div class="h-36 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-5 p-3 relative group"><img src="${item.img || ''}" class="h-full object-contain group-hover:scale-105 transition duration-300"></div>
-            <div class="flex items-center justify-between gap-2 pt-1 mb-2"><h3 class="font-bold text-white text-base truncate leading-relaxed">${item.name} <span class="px-2 py-0.5 bg-[#131622] border border-[#1e2230] text-zinc-400 text-[10px] rounded-md ml-1.5 align-middle">${String(item.cat).toUpperCase()}</span></h3><span class="px-2.5 py-1 text-[9px] font-bold rounded-full uppercase shrink-0 ${badgeStyle}">${badge}</span></div>
-            <p class="text-xs text-zinc-400 line-clamp-2 min-h-[32px] mt-2">${item.desc}</p>
-          </div>
-          <div class="border-t border-[#1e2230] pt-3 mt-4 space-y-3">
-            <div class="w-full bg-[#131622]/60 p-2.5 rounded-xl border border-[#1e2230]">
-              <span class="text-[10px] text-zinc-500 block uppercase font-semibold">Selling / Base Price</span>
-              <div class="flex items-baseline gap-1.5 mt-0.5"><span class="text-lg font-bold font-tech text-amber-400">$${Number(item.price).toLocaleString()}</span><span class="text-xs text-zinc-500 font-mono">($${Number(item.base||item.price).toLocaleString()})</span></div>
-            </div>
-            <div class="flex items-center justify-between gap-2 pt-0.5">
-              <div class="flex items-center gap-1.5 bg-[#131622] px-2.5 py-1.5 rounded-xl border border-[#1e2230]"><span class="text-[10px] text-zinc-400 uppercase font-semibold">Stock / Slot:</span><span class="text-sm font-bold text-white font-mono">${Number(item.stock)}</span></div>
-              <div class="flex items-center gap-1 shrink-0 ml-auto">${stockBtns}</div>
-            </div>
-          </div>
-        </div>
-      `;
-    }); lucide.createIcons();
-  } catch (err) {}
-}
-
-
-// ============================================================================
-// 🛡️ PERBAIKAN MUTLAK: MENGEMBALIKAN FOLDER UTAMA & FITUR BISNIS
-// ============================================================================
-
-function updateRBACUI() {
-  const rank = getUserRank();
-  const safeRank = String(rank).toLowerCase().trim();
-  const isWritable = isBisnisTier(rank); // Bisnis, Don, Moderator (Punya fitur Edit/Aksi)
-  const canView = canViewAdminPanel(rank); // Capo ke atas (Bisa melihat menu)
-
-  // 🚨 KUNCI UTAMA YANG KEMBALI DITAMBAHKAN: Membuka Folder Induk (Transaction & Order)
-  document.querySelectorAll('.admin-only').forEach(el => {
-    if (canView) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  });
-
-  // Fitur eksklusif khusus Moderator
-  document.querySelectorAll('.mod-only').forEach(el => {
-    if (isTopAdmin(rank)) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  });
-
-  document.querySelectorAll('.developer-only').forEach(el => {
-    if (isDeveloper(rank)) {
-      el.classList.add('developer-access');
-      if (el.classList.contains('tab-panel')) {
-        el.style.removeProperty('display');
-      } else {
-        el.classList.remove('hidden');
-        el.style.setProperty('display', 'flex', 'important');
-      }
-    } else {
-      el.classList.add('hidden');
-      el.classList.remove('developer-access');
-      el.style.setProperty('display', 'none', 'important');
-    }
-  });
-
-  // Menampilkan sub-menu di kiri layar
-  const adminTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  adminTabs.forEach(tab => {
-     const btn = document.querySelector(`.nav-btn[data-tab="${tab}"]`);
-     if (btn) btn.style.display = canView ? 'flex' : 'none';
-  });
-
-  // 🟢 Menampilkan Tombol "+ Add Item" & Aksi Khusus untuk Bisnis, Don, dan Moderator
-  const actionBars = ['inventory-action-bar', 'outstanding-action-bar', 'proof-action-bar', 'scrap-action-bar'];
-  actionBars.forEach(id => {
-      const bar = document.getElementById(id);
-      if (bar) bar.style.display = isWritable ? 'flex' : 'none';
-  });
-
-  // Sembunyikan Dashboard khusus untuk pangkat paling bawah (Associates)
-  const navHq = document.getElementById('nav-group-hq');
-  if (navHq) {
-    if (isAssociate(rank)) navHq.classList.add('hidden');
-    else navHq.classList.remove('hidden');
-  }
-}
-
-// 2. TIMPA switchTab agar mereka diizinkan masuk ke halaman tersebut
-function switchTab(tabId) {
-  if (blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
-    logout(); showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda baru saja dibekukan oleh Moderator.", "error"); triggerBlockedModal(); return;
-  }
-  
-  const rank = getUserRank();
-  const safeRank = String(rank).toLowerCase().trim();
-  const canView = canViewAdminPanel(rank); 
-
-  // Pengecekan Akses Menu Admin / Transaksi
-  const adminOnlyTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  
-  // Jika mencoba masuk ke menu Admin TAPI pangkatnya tidak diizinkan melihat (canView)
-  if (adminOnlyTabs.includes(tabId) && !canView) {
-    showToast("ACCESS DENIED", "Area Manajemen Vault ini BERSIFAT RAHASIA!", "error");
-    switchTab('weapon-shop'); return;
-  }
-
-  if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
-    showToast("ACCESS DENIED", "Fitur ini EKSKLUSIF hanya untuk Moderator!", "error"); switchTab('weapon-shop'); return;
-  }
-  if (tabId === 'admin-dashboard' && isAssociate(rank)) {
-    showToast("ACCESS DENIED", "Rank Associates tidak diizinkan melihat dashboard.", "error"); switchTab('weapon-shop'); return;
-  }
-
-  const allNavButtons = document.querySelectorAll('.nav-btn');
-  allNavButtons.forEach(btn => {
-    const targetTab = btn.getAttribute('data-tab'); const iconName = getLucideIconForSubmenu(targetTab);
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
-    if (btn.style.display !== 'none') {
-        let iconEl = btn.querySelector('[data-lucide]');
-        if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
-        else iconEl.setAttribute('data-lucide', iconName);
-    }
-  });
-
-  const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
-  if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
-
-  document.querySelectorAll('.tab-panel').forEach(panel => {
-    panel.classList.add('hidden');
-    panel.style.setProperty('display', 'none', 'important');
-  });
-  const titleMap = {
-    'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live at the checkout terminal.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations of The Old Norse.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders from residents.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and selling prices, and monitor safe stock levels.'], 'release-outstanding': ['Release Held Balance', 'Manage transactions where stock has already been deducted, pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of all incoming and outgoing transactions for The Old Norse.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot of the stock inventory to validate the database log sent to Discord.'], 'metal-scrap': ['Metal Scrap Inventory & Log', 'Official records of scrap metal intake and usage for crafting purposes.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members of The Old Norse.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity, population registration number, and occupation.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage, activate, and set quotas for discount promo codes for weaponry.'], 'account-manager': ['Account Login Credentials', 'Create and manage custom login username and password combinations for senior staff.'], 'blacklist-manager': ['Account Blacklist & Freeze Control', 'Manage the blacklist and freeze the accounts of residents who violate IC/OOC rules.']
-  };
-  const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
-  document.getElementById('view-title').innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
-  document.getElementById('view-subtitle').innerText = info[1];
-  const target = document.getElementById('tab-' + tabId);
-  if (target) target.classList.remove('hidden');
-  
-  const floatCartBtn = document.getElementById('floating-cart-btn');
-  if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
-
-  if (tabId === 'weapon-shop') renderMarketplace(currentMarketplaceFilter);
-  if (tabId === 'profile') renderProfilePage();
-  if (tabId === 'the-old-norse') renderTonCatalog();
-  if (tabId === 'account-manager') renderCustomAccountsTable();
-  if (tabId === 'blacklist-manager') renderBlacklistTable();
-  if (tabId === 'transaction-process') renderTxProcessTable(true);
-  if (tabId === 'vault-stock') renderVaultInventory();
-  if (tabId === 'release-outstanding') renderReleaseOutstanding();
-  if (tabId === 'vault-history') renderVaultHistory(true);
-  if (tabId === 'voucher-manager') renderVoucherManager();
-  if (tabId === 'stock-proof') {
-    renderStockProofHistory();
-    if (document.getElementById('proof-date-auto')) document.getElementById('proof-date-auto').value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-    if (document.getElementById('proof-member-name')) document.getElementById('proof-member-name').value = (currentLoggedInUser || 'ADMIN').toUpperCase();
-  }
-  if (tabId === 'metal-scrap') renderMetalScrapLogs();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-
-// ============================================================================
-// 🛡️ REVISI HAK AKSES: DON KEMBALI MENDAPATKAN HAK EDIT HARGA & STOK
-// ============================================================================
-
-// 1. Moderator adalah pemegang kekuasaan tertinggi mutlak
-function isTopAdmin(rank) { return ['moderator'].includes(String(rank).toLowerCase().trim()); }
-
-// 2. Don Tier (Akses ubah Roster & Lockdown)
-function isDonTier(rank) { return ['moderator', 'don', 'underboss'].includes(String(rank).toLowerCase().trim()); }
-
-// 🚨 3. KUNCI UTAMA: Hak Tulis / Edit / Approve HANYA untuk Moderator, DON, & Bisnis
-// (Don dimasukkan kembali ke sini agar bisa mengedit harga)
-function isBisnisTier(rank) { return ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
-
-// 🚨 4. KUNCI KEDUA: Underboss, Consigliere, Captain, Capo TETAP di kelompok Read-Only (Penonton)
-// (Don sudah dikeluarkan dari sini)
-function isReadOnlyAdminTier(rank) { return ['underboss', 'consigliere', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
-
-function canViewAdminPanel(rank) { return isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
-function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
-
-
-// ============================================================================
-// 🛡️ REVISI MUTLAK: MENGHILANGKAN 4 TOMBOL AKSI UNTUK RANK READ-ONLY
-// ============================================================================
-
-function renderVaultInventory() {
-  try {
-    const grid = document.getElementById('vault-inventory-grid') || document.getElementById('inventory-grid');
-    if (!grid) return;
-    const activeFilter = typeof activeInventoryFilter !== 'undefined' ? activeInventoryFilter : 'all';
-    
-    const filteredItems = vaultInventory.filter(item => {
-      const itemCat = String(item.cat || 'weapon').toLowerCase();
-      if (activeFilter === 'all') return true;
-      return (itemCat === activeFilter || (activeFilter === 'durgs' && itemCat === 'package') || (activeFilter === 'attachments' && itemCat.includes('attach')));
-    });
-    
-    if (document.getElementById('total-inventory-count')) document.getElementById('total-inventory-count').innerText = filteredItems.length;
-    grid.innerHTML = '';
-    if (filteredItems.length === 0) return;
-
-    // 🚨 KUNCI UTAMA: Mengecek apakah user adalah Moderator atau Bisnis
-    const isWritable = isBisnisTier(getUserRank()); 
-
-    filteredItems.forEach((item) => {
-      const originalIdx = vaultInventory.indexOf(item);
-      const badge = String(item.badge || 'NORMAL').toUpperCase();
-      
-      let badgeStyle = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
-      if (badge === 'COMING SOON') badgeStyle = 'bg-pink-500/10 text-pink-500 border border-pink-500/30 font-bold';
-      else if (badge === 'PRE-ORDER') badgeStyle = 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold'; 
-      else if (badge === 'OUT OF STOCK') badgeStyle = 'bg-red-500/10 text-red-500 border border-red-500/20';
-      else if (badge === 'LOW') badgeStyle = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
-      
-      // 🚨 JIKA isWritable FALSE (Seperti Underboss, Don, dll), MAKA KE-4 TOMBOL INI AKAN KOSONG/HILANG
-      let stockBtns = isWritable ? 
-        `<button onclick="changeStock(${originalIdx}, -1)" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center font-bold shrink-0">-</button>
-         <button onclick="changeStock(${originalIdx}, 1)" class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold shrink-0">+</button>
-         <button onclick="openEditItemModal(${originalIdx})" class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center ml-0.5 shrink-0"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-         <button onclick="deleteInventoryItem(${originalIdx})" class="w-7 h-7 rounded-lg bg-[#131622] text-zinc-400 hover:bg-red-600 hover:text-white flex items-center justify-center ml-0.5 border border-[#1e2230] shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` 
-         : '';
-
-      grid.innerHTML += `
-        <div class="bg-[#0e1017] border border-[#1e2230] rounded-2xl p-5 flex flex-col justify-between hover:border-zinc-500 transition shadow-sm">
-          <div>
-            <div class="h-36 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-5 p-3 relative group"><img src="${item.img || ''}" class="h-full object-contain group-hover:scale-105 transition duration-300"></div>
-            <div class="flex items-center justify-between gap-2 pt-1 mb-2"><h3 class="font-bold text-white text-base truncate leading-relaxed">${item.name} <span class="px-2 py-0.5 bg-[#131622] border border-[#1e2230] text-zinc-400 text-[10px] rounded-md ml-1.5 align-middle">${String(item.cat).toUpperCase()}</span></h3><span class="px-2.5 py-1 text-[9px] font-bold rounded-full uppercase shrink-0 ${badgeStyle}">${badge}</span></div>
-            <p class="text-xs text-zinc-400 line-clamp-2 min-h-[32px] mt-2">${item.desc}</p>
-          </div>
-          <div class="border-t border-[#1e2230] pt-3 mt-4 space-y-3">
-            <div class="w-full bg-[#131622]/60 p-2.5 rounded-xl border border-[#1e2230]">
-              <span class="text-[10px] text-zinc-500 block uppercase font-semibold">Selling / Base Price</span>
-              <div class="flex items-baseline gap-1.5 mt-0.5"><span class="text-lg font-bold font-tech text-amber-400">$${Number(item.price).toLocaleString()}</span><span class="text-xs text-zinc-500 font-mono">($${Number(item.base||item.price).toLocaleString()})</span></div>
-            </div>
-            <div class="flex items-center justify-between gap-2 pt-0.5">
-              <div class="flex items-center gap-1.5 bg-[#131622] px-2.5 py-1.5 rounded-xl border border-[#1e2230]"><span class="text-[10px] text-zinc-400 uppercase font-semibold">Stock / Slot:</span><span class="text-sm font-bold text-white font-mono">${Number(item.stock)}</span></div>
-              <div class="flex items-center gap-1 shrink-0 ml-auto">${stockBtns}</div>
-            </div>
-          </div>
-        </div>
-      `;
-    }); lucide.createIcons();
-  } catch (err) {}
-}
-
-
-
 // ============================================================================
 // 🛡️ KUNCI MUTLAK LOCKDOWN: HANYA MODERATOR YANG BISA MENGKLIK
 // ============================================================================
-
-// 1. Robot Penyembunyi Tombol (Menghilangkan tombol dari layar Don/Underboss)
 setInterval(() => {
     document.querySelectorAll('button').forEach(btn => {
         const onclickStr = btn.getAttribute('onclick') || '';
-        // Cari tombol yang memiliki fungsi lockdown
-        if (onclickStr.toLowerCase().includes('lockdown')) {
+        if (String(onclickStr).toLowerCase().includes('lockdown')) {
             if (!isTopAdmin(getUserRank())) {
-                btn.style.display = 'none'; // Sembunyikan jika bukan Moderator
+                btn.style.display = 'none'; 
             } else {
-                btn.style.display = ''; // Munculkan jika Moderator
+                btn.style.display = ''; 
             }
         }
     });
 }, 1000);
 
-// 2. Sistem Pencegat (Mencegah paksaan klik dari Inspect Element / Console)
 const fungsiLockdownAsli = window.toggleVaultLockdown || window.toggleLockdown;
 
 if (typeof fungsiLockdownAsli === 'function') {
@@ -4265,688 +3303,53 @@ if (typeof fungsiLockdownAsli === 'function') {
             if (typeof showToast === 'function') {
                 showToast("ACCESS DENIED", "Otoritas ditolak! Hanya Moderator yang diizinkan mengaktifkan Lockdown.", "error");
             }
-            return; // Tendang! Jangan izinkan sistem terkunci
+            return; 
         }
-        // Jika yang klik benar-benar Moderator, lanjutkan fungsi aslinya
         fungsiLockdownAsli.apply(this, arguments);
     };
 
-    // Timpa fungsi asli di sistem dengan fungsi yang sudah diamankan
     if (window.toggleVaultLockdown) window.toggleVaultLockdown = pengamanLockdown;
     if (window.toggleLockdown) window.toggleLockdown = pengamanLockdown;
 }
 
-// ============================================================================
-// 🚀 FINAL RELEASE RBAC: ATURAN HIERARKI KESELURUHAN MUTLAK (REVISI ASSOCIATES)
-// ============================================================================
-
-// 1. FUNGSI PEMBACA RANK UTAMA
-function getUserRank() {
-  const lowerUser = (typeof currentLoggedInUser !== 'undefined' ? currentLoggedInUser : '').toLowerCase();
-  if (typeof savedProfiles !== 'undefined' && savedProfiles[lowerUser] && savedProfiles[lowerUser].job) {
-      return savedProfiles[lowerUser].job;
-  }
-  return typeof currentUserRole !== 'undefined' ? currentUserRole : 'Soldiers';
-}
-
-function isTopAdmin(rank) { return isDeveloper(rank) || ['moderator'].includes(String(rank).toLowerCase().trim()); }
-function isDonTier(rank) { return isDeveloper(rank) || ['moderator', 'don'].includes(String(rank).toLowerCase().trim()); }
-function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function isReadOnlyAdminTier(rank) { return isDeveloper(rank) || ['underboss', 'consigliere', 'hood father', 'hoodfather', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
-function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
-function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
-
-// 2. TIMPA SISTEM UI MENU KIRI (SIDEBAR)
-function updateRBACUI() {
-  const rank = getUserRank();
-  const safeRank = String(rank).toLowerCase().trim();
-  const isWritable = isBisnisTier(rank); 
-  const canView = canViewAdminPanel(rank);
-
-  // Fitur khusus Moderator
-  document.querySelectorAll('.mod-only').forEach(el => {
-    if (isTopAdmin(rank)) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  });
-
-  // Buka Folder Transaction & Order untuk Writable & Read-Only
-  document.querySelectorAll('.admin-only').forEach(el => {
-    if (canView) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  });
-
-  // Menampilkan Sub-Menu Transaksi
-  const adminTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  adminTabs.forEach(tab => {
-     const btn = document.querySelector(`.nav-btn[data-tab="${tab}"]`);
-     if (btn) btn.style.display = canView ? 'flex' : 'none';
-  });
-
-  // 🚨 BLOKIR Tombol List Roster di menu kiri KHUSUS UNTUK BISNIS
-  const rosterBtn = document.querySelector(`.nav-btn[data-tab="the-old-norse"]`);
-  if (rosterBtn) {
-     rosterBtn.style.display = safeRank === 'bisnis' ? 'none' : 'flex';
-  }
-
-  // Tampilkan Tombol Aksi (+ Add Item) khusus Writable (Mod, Don, Bisnis)
-  const actionBars = ['inventory-action-bar', 'outstanding-action-bar', 'proof-action-bar', 'scrap-action-bar'];
-  actionBars.forEach(id => {
-      const bar = document.getElementById(id);
-      if (bar) bar.style.display = isWritable ? 'flex' : 'none';
-  });
-
-  // 🟢 DASHBOARD TERBUKA UNTUK SEMUA RANK (Termasuk Associates & Soldiers)
-  const navHq = document.getElementById('nav-group-hq');
-  if (navHq) {
-     navHq.classList.remove('hidden');
-  }
-}
-
-// 3. TIMPA SISTEM PERPINDAHAN HALAMAN (SATELIT PENGAWAS MUTLAK)
-function switchTab(tabId) {
-  if (!isDeveloper(getUserRank()) && typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
-    if(typeof logout === 'function') logout(); 
-    if(typeof showToast === 'function') showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda dibekukan.", "error"); 
-    if(typeof triggerBlockedModal === 'function') triggerBlockedModal(); return;
-  }
-  
-  const rank = getUserRank();
-  const safeRank = String(rank).toLowerCase().trim();
-  const canView = canViewAdminPanel(rank); 
-
-  const adminOnlyTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  if (adminOnlyTabs.includes(tabId) && !canView) {
-    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Area Manajemen Vault BERSIFAT RAHASIA!", "error"); switchTab('weapon-shop'); return;
-  }
-
-  if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
-    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Fitur ini EKSKLUSIF hanya untuk Moderator!", "error"); switchTab('weapon-shop'); return;
-  }
-  if (tabId === 'backup-audit' && !isDeveloper(rank)) {
-    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Backup & Audit Log hanya dapat diakses Developer!", "error"); switchTab('weapon-shop'); return;
-  }
-
-  // 🚨 CEGAT ROLE BISNIS MASUK KE ROSTER
-  if (tabId === 'the-old-norse' && safeRank === 'bisnis') {
-    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Role Bisnis tidak memiliki hak akses ke List Roster!", "error"); switchTab('weapon-shop'); return;
-  }
-
-  const allNavButtons = document.querySelectorAll('.nav-btn');
-  allNavButtons.forEach(btn => {
-    const targetTab = btn.getAttribute('data-tab'); const iconName = typeof getLucideIconForSubmenu === 'function' ? getLucideIconForSubmenu(targetTab) : 'box';
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
-    if (btn.style.display !== 'none') {
-        let iconEl = btn.querySelector('[data-lucide]');
-        if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
-        else iconEl.setAttribute('data-lucide', iconName);
-    }
-  });
-
-  const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
-  if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
-
-  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
-  const titleMap = {
-    'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and monitor stock.'], 'release-outstanding': ['Release Held Balance', 'Manage pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of transactions.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot to validate the log.'], 'metal-scrap': ['Metal Scrap Inventory', 'Official records of scrap metal.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage promo codes.'], 'account-manager': ['Account Login Credentials', 'Manage login username and password.'], 'blacklist-manager': ['Account Blacklist Control', 'Manage the blacklist and freeze accounts.']
-  };
-  titleMap['backup-audit'] = ['Backup & Audit Log', 'Secure application data and monitor moderator activity.'];
-  const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
-  const viewTitle = document.getElementById('view-title'); if(viewTitle) viewTitle.innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
-  const viewSub = document.getElementById('view-subtitle'); if(viewSub) viewSub.innerText = info[1];
-  const target = document.getElementById('tab-' + tabId);
-  if (target) {
-    target.classList.remove('hidden');
-    target.style.setProperty('display', 'block', 'important');
-  }
-  
-  const floatCartBtn = document.getElementById('floating-cart-btn');
-  if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
-
-  if (tabId === 'weapon-shop' && typeof renderMarketplace === 'function') renderMarketplace(typeof currentMarketplaceFilter !== 'undefined' ? currentMarketplaceFilter : 'all');
-  if (tabId === 'profile' && typeof renderProfilePage === 'function') renderProfilePage();
-  if (tabId === 'the-old-norse' && typeof renderTonCatalog === 'function') renderTonCatalog();
-  if (tabId === 'account-manager' && typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
-  if (tabId === 'blacklist-manager' && typeof renderBlacklistTable === 'function') renderBlacklistTable();
-  if (tabId === 'transaction-process' && typeof renderTxProcessTable === 'function') renderTxProcessTable(true);
-  if (tabId === 'vault-stock' && typeof renderVaultInventory === 'function') renderVaultInventory();
-  if (tabId === 'release-outstanding' && typeof renderReleaseOutstanding === 'function') renderReleaseOutstanding();
-  if (tabId === 'vault-history' && typeof renderVaultHistory === 'function') renderVaultHistory(true);
-  if (tabId === 'voucher-manager' && typeof renderVoucherManager === 'function') renderVoucherManager();
-  if (tabId === 'backup-audit' && typeof renderAuditLog === 'function') renderAuditLog();
-  if (tabId === 'backup-audit' && typeof renderAuditLog === 'function') renderAuditLog();
-  if (tabId === 'stock-proof' && typeof renderStockProofHistory === 'function') {
-    renderStockProofHistory();
-    const dateAuto = document.getElementById('proof-date-auto'); if(dateAuto) dateAuto.value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-    const memberName = document.getElementById('proof-member-name'); if(memberName) memberName.value = (typeof currentLoggedInUser !== 'undefined' ? currentLoggedInUser : 'ADMIN').toUpperCase();
-  }
-  if (tabId === 'metal-scrap' && typeof renderMetalScrapLogs === 'function') renderMetalScrapLogs();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-// 4. TIMPA KARTU INVENTORY (SEMBUNYIKAN TOMBOL EDIT UNTUK READ-ONLY)
-function renderVaultInventory() {
-  try {
-    const grid = document.getElementById('vault-inventory-grid') || document.getElementById('inventory-grid');
-    if (!grid) return;
-    const activeFilter = typeof activeInventoryFilter !== 'undefined' ? activeInventoryFilter : 'all';
-    const filteredItems = typeof vaultInventory !== 'undefined' ? vaultInventory.filter(item => {
-      const itemCat = String(item.cat || 'weapon').toLowerCase();
-      if (activeFilter === 'all') return true;
-      return (itemCat === activeFilter || (activeFilter === 'durgs' && itemCat === 'package') || (activeFilter === 'attachments' && itemCat.includes('attach')));
-    }) : [];
-    
-    const totCount = document.getElementById('total-inventory-count'); if(totCount) totCount.innerText = filteredItems.length;
-    grid.innerHTML = '';
-    if (filteredItems.length === 0) return;
-
-    const isWritable = isBisnisTier(getUserRank()); 
-
-    filteredItems.forEach((item) => {
-      const originalIdx = vaultInventory.indexOf(item);
-      const badge = String(item.badge || 'NORMAL').toUpperCase();
-      
-      let badgeStyle = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
-      if (badge === 'COMING SOON') badgeStyle = 'bg-pink-500/10 text-pink-500 border border-pink-500/30 font-bold';
-      else if (badge === 'PRE-ORDER') badgeStyle = 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold'; 
-      else if (badge === 'OUT OF STOCK') badgeStyle = 'bg-red-500/10 text-red-500 border border-red-500/20';
-      else if (badge === 'LOW') badgeStyle = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
-      
-      let stockBtns = isWritable ? 
-        `<button onclick="changeStock(${originalIdx}, -1)" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center font-bold shrink-0">-</button>
-         <button onclick="changeStock(${originalIdx}, 1)" class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold shrink-0">+</button>
-         <button onclick="openEditItemModal(${originalIdx})" class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center ml-0.5 shrink-0"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-         <button onclick="deleteInventoryItem(${originalIdx})" class="w-7 h-7 rounded-lg bg-[#131622] text-zinc-400 hover:bg-red-600 hover:text-white flex items-center justify-center ml-0.5 border border-[#1e2230] shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` 
-         : '';
-
-      grid.innerHTML += `
-        <div class="bg-[#0e1017] border border-[#1e2230] rounded-2xl p-5 flex flex-col justify-between hover:border-zinc-500 transition shadow-sm">
-          <div>
-            <div class="h-36 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-5 p-3 relative group"><img src="${item.img || ''}" class="h-full object-contain group-hover:scale-105 transition duration-300"></div>
-            <div class="flex items-center justify-between gap-2 pt-1 mb-2"><h3 class="font-bold text-white text-base truncate leading-relaxed">${item.name} <span class="px-2 py-0.5 bg-[#131622] border border-[#1e2230] text-zinc-400 text-[10px] rounded-md ml-1.5 align-middle">${String(item.cat).toUpperCase()}</span></h3><span class="px-2.5 py-1 text-[9px] font-bold rounded-full uppercase shrink-0 ${badgeStyle}">${badge}</span></div>
-            <p class="text-xs text-zinc-400 line-clamp-2 min-h-[32px] mt-2">${item.desc}</p>
-          </div>
-          <div class="border-t border-[#1e2230] pt-3 mt-4 space-y-3">
-            <div class="w-full bg-[#131622]/60 p-2.5 rounded-xl border border-[#1e2230]">
-              <span class="text-[10px] text-zinc-500 block uppercase font-semibold">Selling / Base Price</span>
-              <div class="flex items-baseline gap-1.5 mt-0.5"><span class="text-lg font-bold font-tech text-amber-400">$${Number(item.price).toLocaleString()}</span><span class="text-xs text-zinc-500 font-mono">($${Number(item.base||item.price).toLocaleString()})</span></div>
-            </div>
-            <div class="flex items-center justify-between gap-2 pt-0.5">
-              <div class="flex items-center gap-1.5 bg-[#131622] px-2.5 py-1.5 rounded-xl border border-[#1e2230]"><span class="text-[10px] text-zinc-400 uppercase font-semibold">Stock / Slot:</span><span class="text-sm font-bold text-white font-mono">${Number(item.stock)}</span></div>
-              <div class="flex items-center gap-1 shrink-0 ml-auto">${stockBtns}</div>
-            </div>
-          </div>
-        </div>
-      `;
-    }); if(typeof lucide !== 'undefined') lucide.createIcons();
-  } catch (err) {}
-}
-
-// 5. TIMPA LIST ROSTER (MASUKKAN HOOD FATHER & BATASI HAK EDIT)
-function renderTonCatalog() {
-  const tableBody = document.getElementById('ton-catalog-table');
-  if (!tableBody) return;
-  const savedProfiles = (typeof getSafeStorage === 'function' ? getSafeStorage('ton_all_profiles') : window.savedProfiles) || {};
-  const allUsers = Object.keys(savedProfiles);
-
-  const filteredUsers = allUsers.filter(user => {
-    const profile = savedProfiles[user] || {};
-    if (user.toLowerCase() === 'developer' || String(profile.job || '').toLowerCase() === 'developer') return false;
-
-    const tabSaatIni = String(typeof currentCatalogTab !== 'undefined' ? currentCatalogTab : 'All').toLowerCase().trim();
-    if (tabSaatIni.includes('all')) return true;
-    const grupUser = String(profile.groupType || 'Family').toLowerCase().trim();
-    return grupUser === tabSaatIni;
-  });
-
-  const rank = getUserRank();
-  const canModifyRoster = isDonTier(rank); // HANYA MODERATOR & DON YANG BISA EDIT ROSTER
-
-  const thActions = document.getElementById('th-roster-actions');
-  const noteAdmin = document.getElementById('roster-admin-note');
-  if (thActions) thActions.style.display = canModifyRoster ? 'table-cell' : 'none';
-  if (noteAdmin) noteAdmin.style.display = canModifyRoster ? 'inline' : 'none';
-
-  if (filteredUsers.length === 0) {
-    const colCount = canModifyRoster ? 4 : 3;
-    tableBody.innerHTML = `<tr><td colspan="${colCount}" class="p-4 text-center text-zinc-500 italic">There are no members registered in the category yet.</td></tr>`;
-    return;
-  }
-  
-  // 🚨 SUSUNAN RANK BARU TERMASUK HOOD FATHER 🚨
-  const rankOptions = ["Moderator", "Don", "Underboss", "Consigliere", "Bisnis", "Hood father", "Captain", "Capo", "Soldiers", "Associates"];
-  tableBody.innerHTML = '';
-  
-  filteredUsers.forEach((username, idx) => {
-    const prof = savedProfiles[username] || {};
-    if (!prof || typeof prof !== 'object' || !prof.name) return;
-    
-    const rankInputId = `catalog-rank-${idx}`;
-    const groupSelectId = `catalog-group-${idx}`;
-    const safeName = prof.name || '-';
-    const currentJob = prof.job || 'Soldiers';
-    const currentGroup = prof.groupType || 'Family';
-    const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(username)}`;
-    const avatarUrl = (prof.avatar && prof.avatar.startsWith('http')) ? prof.avatar : defaultAvatar;
-
-    let groupCellHtml = `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${currentGroup === 'Internal' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}">${currentGroup}</span>`;
-    let rankCellHtml = `<span class="font-bold text-white">${currentJob}</span>`;
-    let actionCellHtml = '';
-
-    if (canModifyRoster) {
-      groupCellHtml = `<select id="${groupSelectId}" class="bg-[#131622] border border-[#1e2230] text-white px-2 py-1 rounded-lg text-xs font-bold"><option value="Internal" ${currentGroup === 'Internal' ? 'selected' : ''}>Internal</option><option value="Family" ${currentGroup === 'Family' ? 'selected' : ''}>Family</option></select>`;
-      let rankSelectOptions = rankOptions.map(r => `<option value="${r}" ${currentJob === r ? 'selected' : ''}>${r}</option>`).join('');
-      rankCellHtml = `<select id="${rankInputId}" class="w-full bg-[#131622] border border-[#1e2230] text-white px-2.5 py-1 rounded-lg text-xs font-bold">${rankSelectOptions}</select>`;
-      actionCellHtml = `<td class="p-3.5 text-right space-x-1.5"><button onclick="adminUpdateCatalogUser('${username}', '${rankInputId}', '${groupSelectId}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 rounded-lg text-xs uppercase shadow-sm">Update</button><button onclick="adminDeleteUser('${username}')" class="bg-red-600 hover:bg-red-500 text-white font-bold px-2 py-1 rounded-lg text-xs uppercase shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button></td>`;
-    }
-
-    tableBody.innerHTML += `
-      <tr class="hover:bg-white/[0.02] transition border-b border-[#1e2230] last:border-0">
-        <td class="p-3.5"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full border border-[#1e2230] overflow-hidden shrink-0 bg-red-500/10"><img src="${avatarUrl}" onerror="this.src='${defaultAvatar}'" class="w-full h-full object-cover"></div><div><p class="font-bold text-white text-xs">${safeName}</p><p class="font-mono text-[11px] text-zinc-500">${username}</p></div></div></td>
-        <td class="p-3.5">${groupCellHtml}</td>
-        <td class="p-3.5">${rankCellHtml}</td>
-        ${actionCellHtml}
-      </tr>
-    `;
-  });
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
 
 // ============================================================================
-// 💉 INJEKSI RANK CAPO: MENGEMBALIKAN CAPO KE MENU DROPDOWN
+// 🧹 BUG KERANJANG FIXED: RESET OTOMATIS & ANTI-BENTROK PADA LOGOUT
 // ============================================================================
-setInterval(() => {
-    document.querySelectorAll('select').forEach(select => {
-        // Cek apakah dropdown ini memiliki opsi Captain
-        const optCaptain = select.querySelector('option[value="Captain"]') || select.querySelector('option[value="captain"]');
-        // Cek apakah Capo sudah ada atau belum
-        const optCapo = select.querySelector('option[value="Capo"]') || select.querySelector('option[value="capo"]');
-        
-        // Jika ada opsi Captain tapi Capo hilang, sisipkan Capo tepat di bawahnya!
-        if (optCaptain && !optCapo) {
-            optCaptain.insertAdjacentHTML('afterend', '<option value="Capo">Capo</option>');
-        }
-    });
-}, 1000);
-
-
-// ============================================================================
-// 🏆 FINAL RELEASE: KODE MASTER HIERARKI MUTLAK (ALL-IN-ONE)
-// ============================================================================
-
-// 1. FUNGSI PEMBACA RANK UTAMA
-function getUserRank() {
-  const lowerUser = (typeof currentLoggedInUser !== 'undefined' ? currentLoggedInUser : '').toLowerCase();
-  if (typeof savedProfiles !== 'undefined' && savedProfiles[lowerUser] && savedProfiles[lowerUser].job) {
-      return savedProfiles[lowerUser].job;
-  }
-  return typeof currentUserRole !== 'undefined' ? currentUserRole : 'Soldiers';
-}
-
-function isTopAdmin(rank) { return isDeveloper(rank) || ['moderator'].includes(String(rank).toLowerCase().trim()); }
-function isDonTier(rank) { return isDeveloper(rank) || ['moderator', 'don'].includes(String(rank).toLowerCase().trim()); }
-function isBisnisTier(rank) { return isDeveloper(rank) || ['moderator', 'don', 'bisnis'].includes(String(rank).toLowerCase().trim()); }
-function isReadOnlyAdminTier(rank) { return isDeveloper(rank) || ['underboss', 'consigliere', 'hood father', 'hoodfather', 'captain', 'capo'].includes(String(rank).toLowerCase().trim()); }
-function canViewAdminPanel(rank) { return isDeveloper(rank) || isBisnisTier(rank) || isReadOnlyAdminTier(rank); }
-function isAssociate(rank) { return String(rank).toLowerCase().trim() === 'associates'; }
-
-// 2. TIMPA SISTEM UI MENU KIRI (SIDEBAR)
-function updateRBACUI() {
-  const rank = getUserRank();
-  const safeRank = String(rank).toLowerCase().trim();
-  const isWritable = isBisnisTier(rank); 
-  const canView = canViewAdminPanel(rank);
-
-  document.querySelectorAll('.mod-only').forEach(el => {
-    if (isTopAdmin(rank)) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  });
-
-  document.querySelectorAll('.developer-only').forEach(el => {
-    if (isDeveloper(rank)) {
-      el.classList.add('developer-access');
-      if (el.classList.contains('tab-panel')) {
-        el.style.removeProperty('display');
-      } else {
-        el.classList.remove('hidden');
-        el.style.setProperty('display', 'flex', 'important');
-      }
-    } else {
-      el.classList.add('hidden');
-      el.classList.remove('developer-access');
-      el.style.setProperty('display', 'none', 'important');
-    }
-  });
-
-  document.querySelectorAll('.admin-only').forEach(el => {
-    if (canView) el.classList.remove('hidden');
-    else el.classList.add('hidden');
-  });
-
-  const adminTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  adminTabs.forEach(tab => {
-     const btn = document.querySelector(`.nav-btn[data-tab="${tab}"]`);
-     if (btn) btn.style.display = canView ? 'flex' : 'none';
-  });
-
-  // 🟢 Tombol List Roster SELALU MUNCUL untuk semuanya (Bisnis bisa melihat)
-  const rosterBtn = document.querySelector(`.nav-btn[data-tab="the-old-norse"]`);
-  if (rosterBtn) rosterBtn.style.display = 'flex';
-
-  const actionBars = ['inventory-action-bar', 'outstanding-action-bar', 'proof-action-bar', 'scrap-action-bar'];
-  actionBars.forEach(id => {
-      const bar = document.getElementById(id);
-      if (bar) bar.style.display = isWritable ? 'flex' : 'none';
-  });
-
-  // 🟢 DASHBOARD TERBUKA UNTUK SEMUA RANK (Termasuk Associates & Soldiers)
-  const navHq = document.getElementById('nav-group-hq');
-  if (navHq) navHq.classList.remove('hidden');
-}
-
-// 3. TIMPA SISTEM PERPINDAHAN HALAMAN
-function switchTab(tabId) {
-  if (!isDeveloper(getUserRank()) && typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes((currentLoggedInUser || '').toLowerCase())) {
-    if(typeof logout === 'function') logout(); 
-    if(typeof showToast === 'function') showToast("ACCOUNT FROZEN", "Sesi dihentikan! Akun Anda dibekukan.", "error"); 
-    if(typeof triggerBlockedModal === 'function') triggerBlockedModal(); return;
-  }
-  
-  const rank = getUserRank();
-  const safeRank = String(rank).toLowerCase().trim();
-  const canView = canViewAdminPanel(rank); 
-
-  const adminOnlyTabs = ['transaction-process', 'vault-stock', 'release-outstanding', 'vault-history', 'stock-proof', 'metal-scrap'];
-  if (adminOnlyTabs.includes(tabId) && !canView) {
-    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Area Manajemen Vault BERSIFAT RAHASIA!", "error"); switchTab('weapon-shop'); return;
-  }
-
-  if ((tabId === 'voucher-manager' || tabId === 'account-manager' || tabId === 'blacklist-manager') && !isTopAdmin(rank)) {
-    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Fitur ini EKSKLUSIF hanya untuk Moderator!", "error"); switchTab('weapon-shop'); return;
-  }
-  if (tabId === 'backup-audit' && !isDeveloper(rank)) {
-    if(typeof showToast === 'function') showToast("ACCESS DENIED", "Backup & Audit Log hanya dapat diakses Developer!", "error"); switchTab('weapon-shop'); return;
-  }
-
-  const allNavButtons = document.querySelectorAll('.nav-btn');
-  allNavButtons.forEach(btn => {
-    const targetTab = btn.getAttribute('data-tab'); const iconName = typeof getLucideIconForSubmenu === 'function' ? getLucideIconForSubmenu(targetTab) : 'box';
-    btn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-zinc-400 hover:text-white hover:bg-white/5 transition text-xs list-none" + (btn.dataset.developerOnly === 'true' ? ' developer-only' : '');
-    if (btn.style.display !== 'none') {
-        let iconEl = btn.querySelector('[data-lucide]');
-        if (!iconEl) btn.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0"></i>`);
-        else iconEl.setAttribute('data-lucide', iconName);
-    }
-  });
-
-  const activeBtn = document.querySelector(`.nav-btn[data-tab="${tabId}"]`);
-  if (activeBtn) activeBtn.className = "nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-xl text-white font-bold bg-white/10 transition shadow-sm text-xs list-none";
-
-  document.querySelectorAll('.tab-panel').forEach(panel => {
-    panel.classList.add('hidden');
-    panel.style.setProperty('display', 'none', 'important');
-  });
-  const titleMap = {
-    'weapon-shop': ['Marketplace Armory', 'Order weaponry and complete the transaction live.'], 'my-orders': ['Processing Order', 'Your order process and history.'], 'admin-dashboard': ['Dashboard', 'A detailed summary of the identity, rank, and vault operations.'], 'transaction-process': ['Resident Order Processing', 'Review, approve, or reject incoming orders.'], 'vault-stock': ['Catalog Inventory', 'Manage inventory items and monitor stock.'], 'release-outstanding': ['Release Held Balance', 'Manage pending final settlement to the vault balance.'], 'vault-history': ['Cash Flow History Archive', 'A complete history of transactions.'], 'stock-proof': ['Upload Stock Photo Proof', 'Attach a screenshot to validate the log.'], 'metal-scrap': ['Metal Scrap Inventory', 'Official records of scrap metal.'], 'the-old-norse': ['List Roster The Old Norse', 'List of official internal and family members.'], 'profile': ['IC Character Profile', 'Detailed information regarding resident identity.'], 'voucher-manager': ['Syndicate Voucher Manager', 'Manage promo codes.'], 'account-manager': ['Account Login Credentials', 'Manage login username and password.'], 'blacklist-manager': ['Account Blacklist Control', 'Manage the blacklist and freeze accounts.']
-  };
-  titleMap['backup-audit'] = ['Backup & Audit Log', 'Secure application data and monitor moderator activity.'];
-  const info = titleMap[tabId] || [tabId.toUpperCase(), 'Dynamic Vault System'];
-  const viewTitle = document.getElementById('view-title'); if(viewTitle) viewTitle.innerHTML = `<i data-lucide="${tabId === 'admin-dashboard' ? 'layout-dashboard' : 'box'}" class="w-5 h-5 text-amber-400 inline"></i> ` + info[0];
-  const viewSub = document.getElementById('view-subtitle'); if(viewSub) viewSub.innerText = info[1];
-  const target = document.getElementById('tab-' + tabId);
-  if (target) {
-    target.classList.remove('hidden');
-    target.style.setProperty('display', 'block', 'important');
-  }
-  
-  const floatCartBtn = document.getElementById('floating-cart-btn');
-  if (floatCartBtn) floatCartBtn.style.display = tabId === 'weapon-shop' ? 'flex' : 'none';
-
-  if (tabId === 'weapon-shop' && typeof renderMarketplace === 'function') renderMarketplace(typeof currentMarketplaceFilter !== 'undefined' ? currentMarketplaceFilter : 'all');
-  if (tabId === 'profile' && typeof renderProfilePage === 'function') renderProfilePage();
-  if (tabId === 'the-old-norse' && typeof renderTonCatalog === 'function') renderTonCatalog();
-  if (tabId === 'account-manager' && typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
-  if (tabId === 'blacklist-manager' && typeof renderBlacklistTable === 'function') renderBlacklistTable();
-  if (tabId === 'transaction-process' && typeof renderTxProcessTable === 'function') renderTxProcessTable(true);
-  if (tabId === 'vault-stock' && typeof renderVaultInventory === 'function') renderVaultInventory();
-  if (tabId === 'release-outstanding' && typeof renderReleaseOutstanding === 'function') renderReleaseOutstanding();
-  if (tabId === 'vault-history' && typeof renderVaultHistory === 'function') renderVaultHistory(true);
-  if (tabId === 'voucher-manager' && typeof renderVoucherManager === 'function') renderVoucherManager();
-  if (tabId === 'backup-audit' && typeof renderAuditLog === 'function') renderAuditLog();
-  if (tabId === 'stock-proof' && typeof renderStockProofHistory === 'function') {
-    renderStockProofHistory();
-    const dateAuto = document.getElementById('proof-date-auto'); if(dateAuto) dateAuto.value = new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-    const memberName = document.getElementById('proof-member-name'); if(memberName) memberName.value = (typeof currentLoggedInUser !== 'undefined' ? currentLoggedInUser : 'ADMIN').toUpperCase();
-  }
-  if (tabId === 'metal-scrap' && typeof renderMetalScrapLogs === 'function') renderMetalScrapLogs();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-// 4. TIMPA KARTU INVENTORY (SEMBUNYIKAN TOMBOL EDIT UNTUK READ-ONLY)
-function renderVaultInventory() {
-  try {
-    const grid = document.getElementById('vault-inventory-grid') || document.getElementById('inventory-grid');
-    if (!grid) return;
-    const activeFilter = typeof activeInventoryFilter !== 'undefined' ? activeInventoryFilter : 'all';
-    const filteredItems = typeof vaultInventory !== 'undefined' ? vaultInventory.filter(item => {
-      const itemCat = String(item.cat || 'weapon').toLowerCase();
-      if (activeFilter === 'all') return true;
-      return (itemCat === activeFilter || (activeFilter === 'durgs' && itemCat === 'package') || (activeFilter === 'attachments' && itemCat.includes('attach')));
-    }) : [];
-    
-    const totCount = document.getElementById('total-inventory-count'); if(totCount) totCount.innerText = filteredItems.length;
-    grid.innerHTML = '';
-    if (filteredItems.length === 0) return;
-
-    const isWritable = isBisnisTier(getUserRank()); 
-
-    filteredItems.forEach((item) => {
-      const originalIdx = vaultInventory.indexOf(item);
-      const badge = String(item.badge || 'NORMAL').toUpperCase();
-      
-      let badgeStyle = 'bg-blue-500/10 text-blue-400 border border-blue-500/20';
-      if (badge === 'COMING SOON') badgeStyle = 'bg-pink-500/10 text-pink-500 border border-pink-500/30 font-bold';
-      else if (badge === 'PRE-ORDER') badgeStyle = 'bg-purple-500/10 text-purple-400 border border-purple-500/30 font-bold'; 
-      else if (badge === 'OUT OF STOCK') badgeStyle = 'bg-red-500/10 text-red-500 border border-red-500/20';
-      else if (badge === 'LOW') badgeStyle = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
-      
-      let stockBtns = isWritable ? 
-        `<button onclick="changeStock(${originalIdx}, -1)" class="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center justify-center font-bold shrink-0">-</button>
-         <button onclick="changeStock(${originalIdx}, 1)" class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold shrink-0">+</button>
-         <button onclick="openEditItemModal(${originalIdx})" class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center ml-0.5 shrink-0"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-         <button onclick="deleteInventoryItem(${originalIdx})" class="w-7 h-7 rounded-lg bg-[#131622] text-zinc-400 hover:bg-red-600 hover:text-white flex items-center justify-center ml-0.5 border border-[#1e2230] shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` 
-         : '';
-
-      grid.innerHTML += `
-        <div class="bg-[#0e1017] border border-[#1e2230] rounded-2xl p-5 flex flex-col justify-between hover:border-zinc-500 transition shadow-sm">
-          <div>
-            <div class="h-36 bg-[#131622] rounded-xl border border-[#1e2230] flex items-center justify-center overflow-hidden mb-5 p-3 relative group"><img src="${item.img || ''}" class="h-full object-contain group-hover:scale-105 transition duration-300"></div>
-            <div class="flex items-center justify-between gap-2 pt-1 mb-2"><h3 class="font-bold text-white text-base truncate leading-relaxed">${item.name} <span class="px-2 py-0.5 bg-[#131622] border border-[#1e2230] text-zinc-400 text-[10px] rounded-md ml-1.5 align-middle">${String(item.cat).toUpperCase()}</span></h3><span class="px-2.5 py-1 text-[9px] font-bold rounded-full uppercase shrink-0 ${badgeStyle}">${badge}</span></div>
-            <p class="text-xs text-zinc-400 line-clamp-2 min-h-[32px] mt-2">${item.desc}</p>
-          </div>
-          <div class="border-t border-[#1e2230] pt-3 mt-4 space-y-3">
-            <div class="w-full bg-[#131622]/60 p-2.5 rounded-xl border border-[#1e2230]">
-              <span class="text-[10px] text-zinc-500 block uppercase font-semibold">Selling / Base Price</span>
-              <div class="flex items-baseline gap-1.5 mt-0.5"><span class="text-lg font-bold font-tech text-amber-400">$${Number(item.price).toLocaleString()}</span><span class="text-xs text-zinc-500 font-mono">($${Number(item.base||item.price).toLocaleString()})</span></div>
-            </div>
-            <div class="flex items-center justify-between gap-2 pt-0.5">
-              <div class="flex items-center gap-1.5 bg-[#131622] px-2.5 py-1.5 rounded-xl border border-[#1e2230]"><span class="text-[10px] text-zinc-400 uppercase font-semibold">Stock / Slot:</span><span class="text-sm font-bold text-white font-mono">${Number(item.stock)}</span></div>
-              <div class="flex items-center gap-1 shrink-0 ml-auto">${stockBtns}</div>
-            </div>
-          </div>
-        </div>
-      `;
-    }); if(typeof lucide !== 'undefined') lucide.createIcons();
-  } catch (err) {}
-}
-
-// 5. TIMPA LIST ROSTER (MASUKKAN HOOD FATHER & BATASI HAK EDIT KHUSUS MOD/DON)
-function renderTonCatalog() {
-  const tableBody = document.getElementById('ton-catalog-table');
-  if (!tableBody) return;
-  const savedProfiles = (typeof getSafeStorage === 'function' ? getSafeStorage('ton_all_profiles') : window.savedProfiles) || {};
-  const allUsers = Object.keys(savedProfiles);
-
-  const filteredUsers = allUsers.filter(user => {
-    const profile = savedProfiles[user] || {};
-    if (user.toLowerCase() === 'developer' || String(profile.job || '').toLowerCase() === 'developer') return false;
-
-    const tabSaatIni = String(typeof currentCatalogTab !== 'undefined' ? currentCatalogTab : 'All').toLowerCase().trim();
-    if (tabSaatIni.includes('all')) return true;
-    const grupUser = String(profile.groupType || 'Family').toLowerCase().trim();
-    return grupUser === tabSaatIni;
-  });
-
-  const rank = getUserRank();
-  const canModifyRoster = isDonTier(rank); // 🚨 HANYA MODERATOR & DON YANG BISA EDIT ROSTER (Bisnis cuma bisa lihat)
-
-  const thActions = document.getElementById('th-roster-actions');
-  const noteAdmin = document.getElementById('roster-admin-note');
-  if (thActions) thActions.style.display = canModifyRoster ? 'table-cell' : 'none';
-  if (noteAdmin) noteAdmin.style.display = canModifyRoster ? 'inline' : 'none';
-
-  if (filteredUsers.length === 0) {
-    const colCount = canModifyRoster ? 4 : 3;
-    tableBody.innerHTML = `<tr><td colspan="${colCount}" class="p-4 text-center text-zinc-500 italic">There are no members registered in the category yet.</td></tr>`;
-    return;
-  }
-  
-  // 🚨 SUSUNAN RANK BARU TERMASUK HOOD FATHER 🚨
-  const rankOptions = ["Moderator", "Don", "Underboss", "Consigliere", "Bisnis", "Hood father", "Captain", "Capo", "Soldiers", "Associates"];
-  tableBody.innerHTML = '';
-  
-  filteredUsers.forEach((username, idx) => {
-    const prof = savedProfiles[username] || {};
-    if (!prof || typeof prof !== 'object' || !prof.name) return;
-    
-    const rankInputId = `catalog-rank-${idx}`;
-    const groupSelectId = `catalog-group-${idx}`;
-    const safeName = prof.name || '-';
-    const currentJob = prof.job || 'Soldiers';
-    const currentGroup = prof.groupType || 'Family';
-    const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(username)}`;
-    const avatarUrl = (prof.avatar && prof.avatar.startsWith('http')) ? prof.avatar : defaultAvatar;
-
-    let groupCellHtml = `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${currentGroup === 'Internal' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}">${currentGroup}</span>`;
-    let rankCellHtml = `<span class="font-bold text-white">${currentJob}</span>`;
-    let actionCellHtml = '';
-
-    if (canModifyRoster) {
-      groupCellHtml = `<select id="${groupSelectId}" class="bg-[#131622] border border-[#1e2230] text-white px-2 py-1 rounded-lg text-xs font-bold"><option value="Internal" ${currentGroup === 'Internal' ? 'selected' : ''}>Internal</option><option value="Family" ${currentGroup === 'Family' ? 'selected' : ''}>Family</option></select>`;
-      let rankSelectOptions = rankOptions.map(r => `<option value="${r}" ${currentJob === r ? 'selected' : ''}>${r}</option>`).join('');
-      rankCellHtml = `<select id="${rankInputId}" class="w-full bg-[#131622] border border-[#1e2230] text-white px-2.5 py-1 rounded-lg text-xs font-bold">${rankSelectOptions}</select>`;
-      actionCellHtml = `<td class="p-3.5 text-right space-x-1.5"><button onclick="adminUpdateCatalogUser('${username}', '${rankInputId}', '${groupSelectId}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 rounded-lg text-xs uppercase shadow-sm">Update</button><button onclick="adminDeleteUser('${username}')" class="bg-red-600 hover:bg-red-500 text-white font-bold px-2 py-1 rounded-lg text-xs uppercase shadow-sm"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button></td>`;
-    }
-
-    tableBody.innerHTML += `
-      <tr class="hover:bg-white/[0.02] transition border-b border-[#1e2230] last:border-0">
-        <td class="p-3.5"><div class="flex items-center gap-3"><div class="w-9 h-9 rounded-full border border-[#1e2230] overflow-hidden shrink-0 bg-red-500/10"><img src="${avatarUrl}" onerror="this.src='${defaultAvatar}'" class="w-full h-full object-cover"></div><div><p class="font-bold text-white text-xs">${safeName}</p><p class="font-mono text-[11px] text-zinc-500">${username}</p></div></div></td>
-        <td class="p-3.5">${groupCellHtml}</td>
-        <td class="p-3.5">${rankCellHtml}</td>
-        ${actionCellHtml}
-      </tr>
-    `;
-  });
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-
-// ============================================================================
-// 🧹 PERBAIKAN BUG KERANJANG: RESET OTOMATIS SAAT LOGOUT / GANTI AKUN
-// ============================================================================
-
-// Menangkap fungsi logout bawaan sistem
-// ============================================================================
-// 🧹 BUG KERANJANG FIXED: RESET OTOMATIS & ANTI-BENTROK
-// ============================================================================
-
-window.fungsiLogoutUtama = window.fungsiLogoutUtama || window.logout || function(){}; 
+const fungsiLogoutAsli = window.logout || function(){}; 
 
 window.logout = function() {
-    // 1. Kosongkan array data keranjang di memori
     if (typeof cart !== 'undefined') cart = []; 
     if (typeof window.cart !== 'undefined') window.cart = [];
     
-    // 2. Hapus memori keranjang dari browser
     localStorage.removeItem('cart');
     localStorage.removeItem('ton_cart');
     localStorage.removeItem('ton_marketplace_cart');
     sessionStorage.removeItem('cart');
     sessionStorage.removeItem('ton_cart');
 
-    // 3. Matikan lambang angka merah di menu
-    if (typeof updateCartCount === 'function') updateCartCount();
-    document.querySelectorAll('.cart-badge, #cart-count, #sidebar-cart-badge').forEach(badge => {
-        badge.innerText = '0';
-        badge.style.display = 'none';
-    });
-
-    // 4. HANCURKAN TOMBOL FLOATING CART
-    const floatCartBtn = document.getElementById('floating-cart-btn');
-    if (floatCartBtn) floatCartBtn.style.display = 'none';
-
-    // 5. Tutup modal keranjang jika terbuka
-    const cartModal = document.getElementById('cart-modal');
-    if (cartModal) cartModal.classList.add('hidden');
-
-    // 6. Lanjutkan proses Logout ke fungsi bawaan
-    if (typeof window.fungsiLogoutUtama === 'function' && window.fungsiLogoutUtama !== window.logout) {
-        window.fungsiLogoutUtama.apply(this, arguments);
-    } else {
-        const appContainer = document.getElementById('app-container');
-        const loginContainer = document.getElementById('login-container');
-        if(appContainer) appContainer.classList.add('hidden');
-        if(loginContainer) loginContainer.classList.remove('hidden');
-        if(typeof currentLoggedInUser !== 'undefined') currentLoggedInUser = null;
-        if(typeof currentUserRole !== 'undefined') currentUserRole = null;
-    }
-};
-
-// ============================================================================
-// 🧹 PERBAIKAN BUG KERANJANG: RESET OTOMATIS & HILANGKAN TOMBOL SAAT LOGOUT
-// ============================================================================
-
-const fungsiLogoutAsli = window.logout || function(){}; // Jaga-jaga jika fungsi asli belum dimuat
-
-window.logout = function() {
-    // 1. Kosongkan array data keranjang di memori
-    if (typeof cart !== 'undefined') cart = []; 
-    if (typeof window.cart !== 'undefined') window.cart = [];
-    
-    // 2. Hapus memori keranjang dari penyimpanan browser 
-    localStorage.removeItem('cart');
-    localStorage.removeItem('ton_cart');
-    localStorage.removeItem('ton_marketplace_cart');
-    sessionStorage.removeItem('cart');
-    sessionStorage.removeItem('ton_cart');
-
-    // 3. Paksa update UI angka (Badge) menjadi kosong
     if (typeof updateCartCount === 'function') {
         updateCartCount();
     } 
     
-    // Manual fallback untuk mematikan lambang angka di menu
     document.querySelectorAll('.cart-badge, #cart-count, #sidebar-cart-badge').forEach(badge => {
         badge.innerText = '0';
         badge.style.display = 'none';
     });
 
-    // 🚨 4. HANCURKAN TOMBOL FLOATING CART DI HALAMAN LOGIN 🚨
     const floatCartBtn = document.getElementById('floating-cart-btn');
     if (floatCartBtn) {
         floatCartBtn.style.display = 'none';
     }
 
-    // Tutup juga panel/modal keranjang jika kebetulan sedang terbuka saat logout
     const cartModal = document.getElementById('cart-modal');
     if (cartModal) {
         cartModal.classList.add('hidden');
     }
 
-    // 5. Lanjutkan proses mengeluarkan akun (Logout) ke fungsi bawaannya
     if (typeof fungsiLogoutAsli === 'function' && fungsiLogoutAsli !== window.logout) {
         fungsiLogoutAsli.apply(this, arguments);
     } else {
-        // Fallback jika fungsi asli ter-override mutlak
         const appContainer = document.getElementById('app-container');
         const loginContainer = document.getElementById('login-container');
         if(appContainer) appContainer.classList.add('hidden');
@@ -4956,39 +3359,26 @@ window.logout = function() {
     }
 };
 
-
 // Mengambil elemen yang dibutuhkan
 const themeToggleBtn = document.getElementById('theme-toggle');
 const themeIcon = document.getElementById('theme-icon');
 const themeText = document.getElementById('theme-text');
-const htmlElement = document.documentElement; // Merujuk ke tag <html>
+const htmlElement = document.documentElement; 
 
-// 1. Cek apakah pengguna sudah pernah memilih tema sebelumnya
 const savedTheme = localStorage.getItem('theme');
 if (savedTheme && themeIcon && themeText) {
     htmlElement.setAttribute('data-theme', savedTheme);
     updateButtonUI(savedTheme);
 }
 
-// 2. Event Listener saat tombol diklik
 if (themeToggleBtn && themeIcon && themeText) themeToggleBtn.addEventListener('click', () => {
-    // Cek tema yang sedang aktif saat ini
     const currentTheme = htmlElement.getAttribute('data-theme');
-    
-    // Tentukan tema baru
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    
-    // Terapkan tema baru ke HTML
     htmlElement.setAttribute('data-theme', newTheme);
-    
-    // Simpan pilihan ke localStorage agar tidak hilang saat di-refresh
     localStorage.setItem('theme', newTheme); 
-    
-    // Perbarui teks dan ikon tombol
     updateButtonUI(newTheme);
 });
 
-// 3. Fungsi untuk mengubah tampilan tombol
 function updateButtonUI(theme) {
   if (!themeIcon || !themeText) return;
   if (theme === 'light') {
@@ -5093,7 +3483,7 @@ function renderAuditLog() {
   const table = document.getElementById('audit-log-table');
   const count = document.getElementById('audit-log-count');
   if (!table) return;
-  const query = (document.getElementById('audit-log-search')?.value || '').toLowerCase();
+  const query = String(document.getElementById('audit-log-search')?.value || '').toLowerCase();
   const rows = (Array.isArray(auditLogs) ? auditLogs : []).filter(log =>
     [log.actor, log.role, log.action, log.details].join(' ').toLowerCase().includes(query)
   );
@@ -5158,7 +3548,7 @@ function renderInternalMessages() {
     viewTitle.innerHTML = '<i data-lucide="message-square" class="w-5 h-5 text-cyan-400 inline"></i> Internal Message Board';
     if (viewSubtitle) viewSubtitle.textContent = 'Komunikasi internal untuk pengumuman dan koordinasi anggota.';
   }
-  const query = (document.getElementById('internal-message-search')?.value || '').toLowerCase();
+  const query = String(document.getElementById('internal-message-search')?.value || '').toLowerCase();
   const messages = (Array.isArray(internalMessages) ? internalMessages : []).filter(item =>
     `${item.author} ${item.role} ${item.message}`.toLowerCase().includes(query)
   );
@@ -5167,7 +3557,7 @@ function renderInternalMessages() {
     <article class="bg-[#131622] border border-[#1e2230] rounded-xl p-4">
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0">${escapeHtml((item.author || '?').slice(0, 2).toUpperCase())}</div>
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold shrink-0">${escapeHtml(String(item.author || '?').slice(0, 2).toUpperCase())}</div>
           <div class="min-w-0"><p class="text-xs font-bold text-white truncate">${escapeHtml(item.author)}</p><p class="text-[10px] text-cyan-400 uppercase">${escapeHtml(item.role)}</p></div>
         </div>
         <div class="flex items-center gap-2 shrink-0"><time class="text-[10px] text-zinc-500">${new Date(item.createdAt).toLocaleString('id-ID')}</time>${isTopAdmin(getUserRank()) ? `<button onclick="deleteInternalMessage('${item.id}')" class="text-zinc-500 hover:text-red-400" title="Hapus pesan"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}</div>
