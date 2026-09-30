@@ -62,7 +62,6 @@ const AKUN_MANUAL = {
   "developer": { pass: "dev123", rank: "Developer", divisi: "Internal" },
 };
 
-// Ganti blok setInterval dengan fungsi ini:
 function initEmergencyAccounts() {
   if (typeof window.customAccounts === 'undefined') window.customAccounts = {};
   if (typeof window.savedProfiles === 'undefined') window.savedProfiles = {};
@@ -74,7 +73,8 @@ function initEmergencyAccounts() {
     }
     if (!window.savedProfiles[user]) {
       window.savedProfiles[user] = {
-        name: user.toUpperCase(),
+        // Tambahkan pengaman agar tidak error jika user undefined
+        name: user ? user.toUpperCase() : "UNKNOWN",
         phone: '0812-9999',
         idcard: 'TON-9999',
         job: data.rank,
@@ -83,7 +83,6 @@ function initEmergencyAccounts() {
       };
     }
   }
-  // Gabungkan
   customAccounts = { ...window.customAccounts, ...customAccounts };
   savedProfiles = { ...window.savedProfiles, ...savedProfiles };
 }
@@ -384,8 +383,9 @@ function applyGlobalState(data) {
     let rawProfiles = data.savedProfiles || {};
     savedProfiles = {}; 
     
-    Object.keys(rawProfiles).forEach(key => {
+Object.keys(rawProfiles).forEach(key => {
         const p = rawProfiles[key];
+        // Pastikan objek p dan p.name ada sebelum memanggil .toUpperCase() atau .toLowerCase()
         if (p && typeof p === 'object' && p.name) {
             const safeKey = p.name.toLowerCase();
             savedProfiles[safeKey] = p;
