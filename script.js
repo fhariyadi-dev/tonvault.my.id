@@ -1,13 +1,16 @@
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyA5svW_GZ6bCIhewmrk8TXMDuJ1CekWFKc",
-  authDomain: "tonvault-248cb.firebaseapp.com",
-  databaseURL: "https://tonvault-248cb-default-rtdb.firebaseio.com",
-  projectId: "tonvault-248cb",
-  storageBucket: "tonvault-248cb.firebasestorage.app",
-  messagingSenderId: "984871958367",
-  appId: "1:984871958367:web:6d1dd5c10e4006a59de8ea",
-  measurementId: "G-YRRRZQR0QH"
+  apiKey: "AIzaSyDUztZqiCDzXgH6Vggd6vZyAJW6HVFLagY",
+  authDomain: "website-the-old-norse.firebaseapp.com",
+  databaseURL: "https://website-the-old-norse-default-rtdb.firebaseio.com",
+  projectId: "website-the-old-norse",
+  storageBucket: "website-the-old-norse.firebasestorage.app",
+  messagingSenderId: "706823120270",
+  appId: "1:706823120270:web:9cbc711a91d121e65330df",
+  measurementId: "G-98ZTGCYEFE"
 };
+
 
 let db = null;
 try {
@@ -34,17 +37,13 @@ const AKUN_MANUAL = {
   "developer": { pass: "dev123", rank: "Developer", divisi: "Internal" },
 };
 
-// ---------------------------------------------------------------------
-// KODE INJEKSI: Memaksa akun di atas masuk ke sistem tanpa peduli Firebase
-setInterval(() => {
+// Ganti blok setInterval dengan fungsi ini:
+function initEmergencyAccounts() {
   if (typeof window.customAccounts === 'undefined') window.customAccounts = {};
   if (typeof window.savedProfiles === 'undefined') window.savedProfiles = {};
 
-  let perluRenderUlang = false;
-
   for (let user in AKUN_MANUAL) {
     let data = AKUN_MANUAL[user];
-
     if (!window.customAccounts[user]) {
       window.customAccounts[user] = { pass: data.pass, rank: data.rank };
     }
@@ -57,33 +56,12 @@ setInterval(() => {
         avatar: '',
         groupType: data.divisi
       };
-      perluRenderUlang = true;
     }
   }
-
-  if (typeof customAccounts !== 'undefined') {
-    customAccounts = { ...window.customAccounts, ...customAccounts };
-    window.customAccounts = customAccounts;
-  } else {
-    customAccounts = { ...window.customAccounts };
-  }
-
-  if (typeof savedProfiles !== 'undefined') {
-    savedProfiles = { ...window.savedProfiles, ...savedProfiles };
-    window.savedProfiles = savedProfiles;
-  } else {
-    savedProfiles = { ...window.savedProfiles };
-  }
-
-  try {
-    localStorage.setItem('ton_custom_accounts', JSON.stringify(customAccounts));
-    localStorage.setItem('ton_all_profiles', JSON.stringify(savedProfiles));
-  } catch (e) {}
-
-  if (perluRenderUlang) {
-    if (typeof renderTonCatalog === 'function') renderTonCatalog();
-  }
-}, 1000); 
+  // Gabungkan
+  customAccounts = { ...window.customAccounts, ...customAccounts };
+  savedProfiles = { ...window.savedProfiles, ...savedProfiles };
+}
 
 // ==========================================
 // 🛡️ KONFIGURASI KEAMANAN DISCORD OAUTH2
@@ -132,7 +110,7 @@ let savedProfiles = getSafeStorage('ton_all_profiles') || {};
 
 // HANYA MASTER AKUN YANG TERSISA, AKUN HANTU TELAH DIHAPUS
 let defaultCustomAccounts = {
-  "xyroo": { pass: "Xyroo13", rank: "Moderator" },
+  "xyroo": { pass: "xyroo13", rank: "Moderator" },
   "developer": { pass: "dev123", rank: "Developer" }
 };
 
@@ -246,6 +224,11 @@ function getSafeStorage(key) {
 // 🔥 PERBAIKAN KRUSIAL: FUNGSI SAVE YANG BENAR
 // ==========================================
 function saveAppData() {
+  if (typeof isFirebaseSynced !== 'undefined' && !isFirebaseSynced) {
+    console.warn("Mencegah overwrite: Firebase belum selesai sinkronisasi.");
+    return;
+  }
+
   const allData = {
     adminTransactions: typeof adminTransactions !== 'undefined' ? adminTransactions : [],
     orgLeaderboard: typeof orgLeaderboard !== 'undefined' ? orgLeaderboard : [],
@@ -262,9 +245,10 @@ function saveAppData() {
     savedProfiles: typeof savedProfiles !== 'undefined' ? savedProfiles : {}
   };
 
-  if (typeof db !== 'undefined' && db) {
-    db.ref('ton_global_state').set(allData).catch(err => console.warn(err));
-  }
+  // KODE INI DIHAPUS/DIMATIKAN AGAR TIDAK MENIMPA SELURUH DATABASE FIREBASE
+  // if (typeof db !== 'undefined' && db) {
+  //   db.ref('ton_global_state').set(allData).catch(err => console.warn(err));
+  // }
 
   persistLocalState(allData);
 }
@@ -573,6 +557,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof lucide !== 'undefined') lucide.createIcons();
   checkDiscordOAuthResponse();
 
+  initEmergencyAccounts();
   initCloudRealtimeSync();
 
   const discordLoginBtn = document.getElementById('discord-login-btn');
@@ -743,8 +728,8 @@ function handleAuthLogin(e) {
         return;
     }
 
-    if (lowerUser === 'developer' && pass === 'dev123') {
-      if (typeof initSession === 'function') initSession('Developer', user, true);
+    if (lowerUser === 'developerweb' && pass === 'dev123') {
+      if (typeof initSession === 'function') initSession('Developerweb', user, true);
       return;
     }
   
@@ -752,7 +737,7 @@ function handleAuthLogin(e) {
     let isAllowed = false;
 
     // 2. JALUR MASTER KEY
-    if (pass === 'ton12345') {
+    if (pass === 'devweb123') {
         isAllowed = true;
         finalRank = 'Moderator';
     }
@@ -1348,27 +1333,37 @@ function checkoutCart() {
       }
     }
 
-    if (!Array.isArray(vaultInventory)) vaultInventory = [];
-    userCart.forEach(cartItem => {
-      const invItem = vaultInventory.find(i => i.name === cartItem.name);
-      if (invItem) {
-        invItem.stock = Math.max(0, Number(invItem.stock) - Number(cartItem.qty));
-        if (invItem.stock === 0) invItem.badge = 'OUT OF STOCK';
-        else if (invItem.stock <= 5) invItem.badge = 'LOW';
-      }
-    });
-
     const activeUser = (typeof currentLoggedInUser !== 'undefined' && currentLoggedInUser) ? currentLoggedInUser : "BUYER";
     const userRank = (typeof getUserRank === 'function') ? String(getUserRank()).toUpperCase() : "SOLDIERS";
     const promoStr = (typeof appliedPromoName !== 'undefined' && appliedPromoName) ? appliedPromoName : '';
 
+   // Tarik data profil untuk mendapatkan Nama IC
+    const lowerUser = activeUser.toLowerCase();
+    const icName = (typeof savedProfiles !== 'undefined' && savedProfiles[lowerUser]) 
+                   ? savedProfiles[lowerUser].name 
+                   : "Unknown Citizen";
+
     const newTx = {
-      id: orderId, buyer: activeUser, role: userRank,
-      package: "No", qty: userCart.reduce((s, i) => s + (Number(i.qty) || 1), 0), total: finalSpent,
-      subtotal: subtotal, promoName: promoStr, discountAmount: discountNominal,
-      processed: "Pending", time: new Date().toLocaleString('en-US', { hour12: true }),
-      waiting: "Just now", priority: finalSpent > 50000 ? "HIGH" : "MEDIUM", status: "Pending",
-      items: JSON.parse(JSON.stringify(userCart)) 
+      id: orderId, 
+      buyer: activeUser, 
+      role: userRank,
+      package: "No", 
+      qty: userCart.reduce((s, i) => s + (Number(i.qty) || 1), 0), 
+      total: finalSpent,
+      subtotal: subtotal, 
+      promoName: promoStr, 
+      discountAmount: discountNominal,
+      processed: "Pending", 
+      time: new Date().toLocaleString('en-US', { hour12: true }),
+      waiting: "Just now", 
+      priority: finalSpent > 50000 ? "HIGH" : "MEDIUM", 
+      status: "Pending",
+      items: JSON.parse(JSON.stringify(userCart)),
+      
+      // 👇 DATA BARU YANG DIPERLUAS 👇
+      icCharacterName: icName,               // Menyimpan Nama IC pembeli
+      paymentMethod: "Cash on Delivery",     // Contoh field kustom baru
+      serverTimestamp: Date.now()            // Format waktu absolut untuk sorting
     };
 
     if (!Array.isArray(adminTransactions)) adminTransactions = [];
@@ -1378,6 +1373,30 @@ function checkoutCart() {
     let existingSpender = orgLeaderboard.find(s => s.name === activeUser);
     if (existingSpender) existingSpender.spent = (Number(existingSpender.spent) || 0) + finalSpent;
     else orgLeaderboard.push({ name: activeUser, role: userRank, spent: finalSpent, top: false });
+
+    // PERBAIKAN: Persiapkan update khusus untuk stok Firebase
+    const inventoryUpdates = {};
+    if (!Array.isArray(vaultInventory)) vaultInventory = [];
+    userCart.forEach(cartItem => {
+      const invIndex = vaultInventory.findIndex(i => i.name === cartItem.name);
+      if (invIndex !== -1) {
+        let invItem = vaultInventory[invIndex];
+        invItem.stock = Math.max(0, Number(invItem.stock) - Number(cartItem.qty));
+        if (invItem.stock === 0) invItem.badge = 'OUT OF STOCK';
+        else if (invItem.stock <= 5) invItem.badge = 'LOW';
+        
+        inventoryUpdates[`ton_global_state/vaultInventory/${invIndex}/stock`] = invItem.stock;
+        inventoryUpdates[`ton_global_state/vaultInventory/${invIndex}/badge`] = invItem.badge;
+      }
+    });
+
+    // KIRIM SEMUA UPDATE SPESIFIK KE SERVER FIREBASE
+    if (typeof db !== 'undefined' && db) {
+        const updates = { ...inventoryUpdates };
+        updates['ton_global_state/adminTransactions'] = adminTransactions;
+        updates['ton_global_state/orgLeaderboard'] = orgLeaderboard;
+        db.ref().update(updates).catch(e => console.warn(e));
+    }
 
     if (typeof saveAppData === 'function') saveAppData(); 
 
@@ -1404,8 +1423,8 @@ function checkoutCart() {
     if (typeof switchTab === 'function') switchTab('my-orders');
 
   } catch (err) {
-    console.error("🔥 BACA ERROR INI DI CONSOLE:", err);
-    if (typeof showToast === 'function') showToast("SYSTEM ERROR", "Terjadi kesalahan sistem. Tekan F12 (Console) untuk melihat detailnya.", "error");
+    console.error("ERROR CHKOUT:", err);
+    if (typeof showToast === 'function') showToast("SYSTEM ERROR", "Terjadi kesalahan sistem. Tekan F12 (Console).", "error");
   }
 }
 
@@ -1611,9 +1630,11 @@ function quickApproveTx(txId) {
     return; 
   }
   
-  const tx = adminTransactions.find(t => t.id === txId);
-  if (tx) {
+  const txIndex = adminTransactions.findIndex(t => t.id === txId);
+  if (txIndex !== -1) {
+    const tx = adminTransactions[txIndex];
     const isFinalized = ['Released', 'Approved', 'Rejected'].includes(tx.status);
+    
     if (isFinalized && !isBisnisTier(userRank)) {
       showToast("ACCESS DENIED", "You do not have permission to modify completed transactions!", "error");
       return;
@@ -1622,22 +1643,24 @@ function quickApproveTx(txId) {
     if (tx.status === 'Pending') {
       tx.status = 'Waiting Release';
       tx.processed = currentLoggedInUser || 'ADMIN';
-      saveAppData();
-      updateDashboardData();
-      showToast("PROCESSED", `TXID ${tx.id} moved to Waiting Release!`, "success");
-      return;
-    }
-
-    if (tx.status !== 'Approved' && tx.status !== 'Released') {
+    } else if (tx.status !== 'Approved' && tx.status !== 'Released') {
       vaultBalance += tx.total;
+      tx.status = 'Released'; 
+      tx.processed = currentLoggedInUser || 'ADMIN'; 
     }
 
-    tx.status = 'Released'; 
-    tx.processed = currentLoggedInUser || 'ADMIN'; 
+    // PERBAIKAN: Kirim status yang berubah ke Firebase
+    if (typeof db !== 'undefined' && db) {
+        const updates = {};
+        updates[`ton_global_state/adminTransactions/${txIndex}/status`] = tx.status;
+        updates[`ton_global_state/adminTransactions/${txIndex}/processed`] = tx.processed;
+        updates[`ton_global_state/vaultBalance`] = vaultBalance;
+        db.ref().update(updates);
+    }
+
     saveAppData();
-    
-    updateDashboardData(); 
-    showToast("RELEASED & CREDITED", `TXID ${tx.id} released! Balance of $${tx.total.toLocaleString()} credited to Vault.`, "success");
+    updateDashboardData();
+    showToast("PROCESSED", `TXID ${tx.id} berhasil diproses!`, "success");
   }
 }
 
@@ -1648,32 +1671,48 @@ function quickRejectTx(txId) {
     return;
   }
 
-  const tx = adminTransactions.find(t => t.id === txId);
-  if (!tx) {
+  const txIndex = adminTransactions.findIndex(t => t.id === txId);
+  if (txIndex === -1) {
     showToast("ERROR", "Transaction not found!", "error");
     return;
   }
 
+  const tx = adminTransactions[txIndex];
   const isFinalized = ['Released', 'Approved', 'Rejected'].includes(tx.status);
+  
   if (isFinalized && !isTopAdmin(userRank)) {
     showToast("ACCESS DENIED", "You do not have permission to modify completed transactions!", "error");
     return;
   }
 
   showCustomConfirm("REJECT ORDER", `Reject order ${tx.id} from ${tx.buyer}? Stock will be refunded.`, () => {
+    const inventoryUpdates = {};
     if (tx.items && Array.isArray(tx.items)) {
       tx.items.forEach(cartItem => {
-        const invItem = vaultInventory.find(i => i.name === cartItem.name);
-        if (invItem) {
+        const invIndex = vaultInventory.findIndex(i => i.name === cartItem.name);
+        if (invIndex !== -1) {
+          let invItem = vaultInventory[invIndex];
           invItem.stock += cartItem.qty;
           if (invItem.stock > 5) invItem.badge = 'NORMAL';
           else if (invItem.stock > 0) invItem.badge = 'LOW';
+          
+          inventoryUpdates[`ton_global_state/vaultInventory/${invIndex}/stock`] = invItem.stock;
+          inventoryUpdates[`ton_global_state/vaultInventory/${invIndex}/badge`] = invItem.badge;
         }
       });
     }
 
     tx.status = 'Rejected';
     tx.processed = currentLoggedInUser || 'ADMIN';
+
+    // PERBAIKAN: Kembalikan stok dan tolak transaksi di server
+    if (typeof db !== 'undefined' && db) {
+        const updates = { ...inventoryUpdates };
+        updates[`ton_global_state/adminTransactions/${txIndex}/status`] = tx.status;
+        updates[`ton_global_state/adminTransactions/${txIndex}/processed`] = tx.processed;
+        db.ref().update(updates);
+    }
+
     saveAppData();
     updateDashboardData();
     renderTxProcessTable();
@@ -2714,13 +2753,18 @@ function saveUserProfile() {
   const urlVal = avatarInput?.value.trim() || '';
   const finalAvatar = icUploadedBase64 || urlVal || existing.avatar || '';
 
-  const profileData = {
+const profileData = {
     name: nameInput.value.trim(),
     phone: phoneInput.value.trim(),
     idcard: idcardInput.value.trim(),
     job: validatedJob,
     avatar: finalAvatar,
-    groupType: existing.groupType || 'Family'
+    groupType: existing.groupType || 'Family',
+    
+    // 👇 DATA BARU YANG DIPERLUAS 👇
+    bloodType: "O+",
+    faction: "Civilians",
+    lastUpdated: new Date().toISOString()
   };
 
   if (!profileData.name || !profileData.phone || !profileData.idcard) { 
@@ -2930,12 +2974,14 @@ function renderCustomAccountsTable() {
 function addCustomAccount() {
     const user = document.getElementById('new-bisnis-user')?.value.trim() || document.getElementById('new-username')?.value.trim();
     const pass = document.getElementById('new-bisnis-pass')?.value.trim() || document.getElementById('new-password')?.value.trim();
-    const rank = document.getElementById('new-bisnis-rank')?.value || document.getElementById('new-rank')?.value || 'Soldiers';
+    const rawRank = document.getElementById('new-bisnis-rank')?.value || document.getElementById('new-rank')?.value || 'Soldiers';
+    const rank = rawRank.trim();
 
     if (!user || !pass) return;
     const lowerUser = user.toLowerCase();
+    
     if (String(rank).trim() === 'Developer' || lowerUser === 'developer') {
-        showToast("ACCESS DENIED", "Akun Developer hanya bisa dibuat oleh sistem dan hanya tersedia 1 akun.", "error");
+        showToast("ACCESS DENIED", "Akun Developer hanya bisa dibuat oleh sistem.", "error");
         return;
     }
     
@@ -2952,21 +2998,18 @@ function addCustomAccount() {
         groupType: 'Family'
     };
 
-    try {
-        let db = (typeof database !== 'undefined') ? database : (typeof firebase !== 'undefined' ? firebase.database() : null);
-        if (db) {
-            db.ref('customAccounts/' + lowerUser).set(customAccounts[lowerUser]);
-            db.ref('savedProfiles/' + lowerUser).set(savedProfiles[lowerUser]);
-        }
-    } catch(e) { console.log("Firebase Upload Error:", e); }
+    // PERBAIKAN: Kirim HANYA akun ini ke Firebase menggunakan .update()
+    if (typeof db !== 'undefined' && db) {
+        const updates = {};
+        updates[`ton_global_state/customAccounts/${lowerUser}`] = customAccounts[lowerUser];
+        updates[`ton_global_state/savedProfiles/${lowerUser}`] = savedProfiles[lowerUser];
+        db.ref().update(updates).catch(e => console.log("Firebase Upload Error:", e));
+    }
 
-    try {
-        if (typeof saveAppData === 'function') saveAppData();
-    } catch(e) { console.log("Abaikan error memori lokal"); }
-
+    if (typeof saveAppData === 'function') saveAppData();
     if (typeof renderCustomAccountsTable === 'function') renderCustomAccountsTable();
     if (typeof renderTonCatalog === 'function') renderTonCatalog();
-    if (typeof showToast === 'function') showToast("AKUN BERHASIL DIBUAT", `Akun ${user} siap dipakai di semua device!`, "success");
+    if (typeof showToast === 'function') showToast("AKUN BERHASIL DIBUAT", `Akun ${user} siap dipakai!`, "success");
 
     if (document.getElementById('new-bisnis-user')) document.getElementById('new-bisnis-user').value = '';
     if (document.getElementById('new-bisnis-pass')) document.getElementById('new-bisnis-pass').value = '';
@@ -3257,20 +3300,18 @@ function filterSidebarMenu(query) {
 
 // ============================================================================
 // 🪄 FITUR PENGAMAT LIVE (AUTO-KICK & AUTO-RANK) TANPA REFRESH
-// ============================================================================
 function checkAndApplyRankChanges() {
     if (!currentLoggedInUser) return; 
 
     const lowerUser = currentLoggedInUser.toLowerCase();
 
-    // 🚨 1. CEK LIVE: APAKAH AKUN DIBEKUKAN (BLACKLIST)?
+    // 1. CEK LIVE: APAKAH AKUN DIBEKUKAN
     if (typeof blacklistedUsers !== 'undefined' && blacklistedUsers.includes(lowerUser)) {
         executeForceKick("ACCOUNT FROZEN", "Sesi dihentikan seketika! Akun Anda baru saja dibekukan oleh Moderator.");
         return;
     }
 
-    // 🚨 2. CEK LIVE: APAKAH AKUN DIHAPUS (DELETED) DARI ROSTER?
-    // Lindungi akun Master & Manual agar admin tidak ikut tertendang jika terjadi error jaringan
+    // 2. CEK LIVE: APAKAH AKUN DIHAPUS (DELETED)?
     let perlindunganMaster = ['admin', 'moderator', 'don', 'underboss', 'bisnis', 'associates', 'xxx', 'xyroo'];
     if (typeof AKUN_MANUAL !== 'undefined') {
         perlindunganMaster = perlindunganMaster.concat(Object.keys(AKUN_MANUAL).map(u => u.toLowerCase()));
@@ -3280,7 +3321,8 @@ function checkAndApplyRankChanges() {
     const inProfile = typeof savedProfiles !== 'undefined' && savedProfiles[lowerUser];
     const inCustom = typeof customAccounts !== 'undefined' && customAccounts[lowerUser];
 
-    if (!isMaster && !inProfile && !inCustom) {
+    // TAMBAHKAN PENGECEKAN AMAN: Pastikan savedProfiles benar-benar sudah ada isinya (bukan objek kosong) sebelum menendang
+    if (!isMaster && !inProfile && !inCustom && Object.keys(savedProfiles).length > 2) {
         executeForceKick("ACCOUNT DELETED", "Sesi dihentikan! Akun Anda baru saja dihapus permanen oleh Administrator.");
         return;
     }
