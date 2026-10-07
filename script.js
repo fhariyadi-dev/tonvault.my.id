@@ -1671,7 +1671,9 @@ function renderTxProcessTable(isRefresh = false) {
   if (prevBtn) prevBtn.disabled = (activeTxPage === 1);
   if (nextBtn) nextBtn.disabled = (activeTxPage === totalPages || totalPages === 1);
 
-  table.innerHTML = '';
+  // KUNCI ANTI-LAG: Kita menampung HTML di dalam string memori terlebih dahulu
+  let tableHTML = '';
+
   if (paginatedData.length === 0) {
     table.innerHTML = `<tr><td colspan="12" class="p-8 text-center text-zinc-500 italic">No transactions found matching your filter criteria.</td></tr>`;
     return;
@@ -1687,7 +1689,6 @@ function renderTxProcessTable(isRefresh = false) {
 
     let actionButtonsHtml = `<button onclick="openTxDetailModal('${tx.id}')" class="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg transition" title="View Detail"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>`;
     
-    // KUNCI PERBAIKAN: Sembunyikan tombol Approve & Reject jika pesanan sudah masuk antrean Release atau selesai
     if (isWritable) {
       if (tx.status === 'Pending') {
         actionButtonsHtml += `
@@ -1695,7 +1696,6 @@ function renderTxProcessTable(isRefresh = false) {
           <button onclick="quickRejectTx('${tx.id}')" class="p-1.5 bg-red-500/10 text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition ml-1" title="Reject & Refund"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
         `;
       } else if (tx.status === 'Rejected' && isTop) {
-        // Tombol hapus permanen tetap muncul jika statusnya Rejected (khusus Top Admin)
         actionButtonsHtml += `
           <button onclick="quickRejectTx('${tx.id}')" class="p-1.5 bg-zinc-500/10 text-zinc-400 hover:bg-red-600 hover:text-white rounded-lg transition ml-1" title="Delete Permanently"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
         `;
@@ -1707,10 +1707,14 @@ function renderTxProcessTable(isRefresh = false) {
       voucherBadgeHtml = `<span class="block text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 px-1.5 py-0.5 rounded-md mt-1 w-max" title="Voucher Diskon Applied"><i data-lucide="ticket" class="w-2.5 h-2.5 inline mr-0.5"></i> ${tx.promoName}</span>`;
     }
 
-    table.innerHTML += `
+    // KUNCI ANTI-LAG: Menambahkan string tanpa membebani browser (Tidak pakai DOM innerHTML di dalam loop)
+    tableHTML += `
       <tr class="hover:bg-white/[0.02] transition border-b border-[#1e2230] last:border-0">
         <td class="p-4 font-mono text-zinc-300 font-semibold">${tx.id}</td>
-        <td class="p-4 font-semibold text-white flex items-center gap-2"><i data-lucide="user" class="w-3.5 h-3.5 text-zinc-500"></i> ${tx.buyer}</td>
+        <td class="p-4 font-semibold text-white flex items-center gap-2">
+           <div class="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700 shrink-0"><i data-lucide="user" class="w-3.5 h-3.5 text-zinc-400"></i></div>
+           ${tx.buyer}
+        </td>
         <td class="p-3.5"><span class="px-2.5 py-0.5 bg-[#131622] border border-[#1e2230] text-zinc-300 rounded-full text-[10px] font-semibold uppercase">${tx.role}</span></td>
         <td class="p-4 text-zinc-400">${tx.package}</td>
         <td class="p-4 font-semibold text-white">${tx.qty}</td>
@@ -1727,6 +1731,9 @@ function renderTxProcessTable(isRefresh = false) {
       </tr>
     `;
   });
+
+  // Tembak HTML ke layar dalam 1 kali proses eksekusi (Super Ringan)
+  table.innerHTML = tableHTML;
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -1812,17 +1819,11 @@ function quickApproveTx(txId) {
       tx.processed = currentLoggedInUser || 'ADMIN'; 
     }
 
-    // KUNCI PERBAIKAN: Sinkronisasi Multipel ke Firebase Secara Bersamaan
-    if (typeof db !== 'undefined' && db) {
-        const updates = {};
-        updates['ton_global_state/adminTransactions'] = adminTransactions;
-        updates['ton_global_state/vaultBalance'] = vaultBalance;
-        db.ref().update(updates);
-    }
-
-    // Simpan lokal dan paksa render semua komponen UI Keuangan
+    // KUNCI PERBAIKAN: Sinkronisasi cukup via saveAppData untuk menghindari crash/lag
     saveAppData();
     updateDashboardData(); 
+    if (typeof renderTxProcessTable === 'function') renderTxProcessTable(true);
+    if (typeof renderReleaseOutstanding === 'function') renderReleaseOutstanding();
     
     showToast("PROCESSED", `TXID ${tx.id} berhasil diproses!`, "success");
   }
@@ -1843,9 +1844,7 @@ function quickRejectTx(txId) {
 
   const tx = adminTransactions[txIndex];
 
-  // ==========================================
-  // FITUR HAPUS PERMANEN (JIKA SUDAH REJECTED)
-  // ==========================================
+  // HAPUS PERMANEN
   if (tx.status === 'Rejected') {
     if (!isTopAdmin(userRank)) {
       showToast("ACCESS DENIED", "Hanya Moderator yang berhak menghapus riwayat permanen!", "error");
@@ -1854,12 +1853,8 @@ function quickRejectTx(txId) {
     showCustomConfirm("HAPUS PERMANEN", `Hapus riwayat pesanan ${tx.id} secara permanen?`, () => {
       adminTransactions.splice(txIndex, 1);
       
-      if (typeof db !== 'undefined' && db) {
-        db.ref('ton_global_state/adminTransactions').set(adminTransactions);
-      }
-      
-      if (typeof saveAppData === 'function') saveAppData(); 
-      if (typeof updateDashboardData === 'function') updateDashboardData();
+      saveAppData(); 
+      updateDashboardData();
       if (typeof renderTxProcessTable === 'function') renderTxProcessTable(true);
       
       showToast("DELETED", "Riwayat pesanan berhasil dihapus permanen.", "success");
@@ -1873,9 +1868,7 @@ function quickRejectTx(txId) {
     return;
   }
 
-  // ==========================================
-  // FITUR TOLAK PESANAN
-  // ==========================================
+  // TOLAK PESANAN
   showCustomConfirm("REJECT ORDER", `Tolak pesanan ${tx.id} dari ${tx.buyer}? Stok akan dikembalikan.`, () => {
     try {
         // 1. Kembalikan stok ke Vault
@@ -1903,21 +1896,10 @@ function quickRejectTx(txId) {
         tx.status = 'Rejected';
         tx.processed = currentLoggedInUser || 'ADMIN';
 
-        // 4. Paksa update ke Firebase secara akurat & spesifik
-        if (typeof db !== 'undefined' && db) {
-            // Tembak update status hanya pada index pesanan ini saja
-            db.ref('ton_global_state/adminTransactions/' + txIndex).update({
-                status: 'Rejected',
-                processed: tx.processed
-            });
-            // Update sinkronisasi inventaris dan uang
-            db.ref('ton_global_state/vaultInventory').set(vaultInventory);
-            db.ref('ton_global_state/orgLeaderboard').set(orgLeaderboard);
-        }
-
-        // 5. Simpan dan Segarkan Tampilan (WAJIB PAKAI TRUE)
-        if (typeof saveAppData === 'function') saveAppData(); 
-        if (typeof updateDashboardData === 'function') updateDashboardData();
+        // 4. KUNCI PERBAIKAN: Cukup gunakan SATU pintu penyimpanan (saveAppData)
+        // Kita menghapus db.ref.update() yang lama agar tidak membombardir Firebase
+        saveAppData(); 
+        updateDashboardData();
         if (typeof renderTxProcessTable === 'function') renderTxProcessTable(true);
 
         showToast("ORDER REJECTED", `Pesanan ${tx.id} ditolak dan statistik uang di-update.`, "error");
