@@ -2443,8 +2443,7 @@ function renderVaultHistory(isRefresh = false) {
     return;
   }
 
- // UBAH BARIS 2446 MENJADI INI:
-filtered.slice(0, 50).forEach(tx => {
+  filtered.forEach(tx => {
     const statColor = tx.status === 'Approved' || tx.status === 'Released' 
       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
       : (tx.status === 'Rejected' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20');
